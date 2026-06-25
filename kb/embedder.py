@@ -97,12 +97,16 @@ class ZhipuEmbedder(BaseEmbedder):
     def embed(self, text: str) -> list[float]:
         resp = httpx.post(
             self._URL,
-            json={"model": self._model, "input": text, "dimensions": self._dims},
+            json={"model": self._model, "input": text},
             headers=self._headers,
             timeout=_TIMEOUT,
         )
         resp.raise_for_status()
-        return resp.json()["data"][0]["embedding"]
+        vector = resp.json()["data"][0]["embedding"]
+        # Zhipu embedding-3 returns 2048 dims by default — truncate to match pgvector table
+        if len(vector) > self._dims:
+            vector = vector[: self._dims]
+        return vector
 
 
 # ── Factory ───────────────────────────────────────────────────────────────────
