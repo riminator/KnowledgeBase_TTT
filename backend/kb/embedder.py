@@ -3,7 +3,7 @@ Embedding provider abstraction.
 
 Providers:
   OllamaEmbedder  — local Ollama (default, EMBED_PROVIDER=ollama)
-  ZhipuEmbedder   — Zhipu AI cloud API (EMBED_PROVIDER=zhipu)
+  NomicEmbedder   — Nomic AI cloud API (EMBED_PROVIDER=nomic, free)
 
 Both return a list[float] of length EMBED_DIMENSIONS (default 768).
 
@@ -12,15 +12,13 @@ Usage:
   vector = embed("some text")
 
 To switch providers, set in .env:
-  # Cloud (Zhipu):
-  EMBED_PROVIDER=zhipu
-  ZHIPU_API_KEY=your_key
-  EMBED_DIMENSIONS=768
+  # Cloud (Nomic, free):
+  EMBED_PROVIDER=nomic
+  NOMIC_API_KEY=your_key
 
   # Local (Ollama):
   EMBED_PROVIDER=ollama
   OLLAMA_EMBED_MODEL=nomic-embed-text
-  EMBED_DIMENSIONS=768
 """
 from __future__ import annotations
 
@@ -31,10 +29,10 @@ import httpx
 from kb.config import (
     EMBED_DIMENSIONS,
     EMBED_PROVIDER,
+    NOMIC_API_KEY,
+    NOMIC_EMBED_MODEL,
     OLLAMA_EMBED_MODEL,
     OLLAMA_HOST,
-    ZHIPU_API_KEY,
-    ZHIPU_EMBED_MODEL,
 )
 
 _TIMEOUT = httpx.Timeout(120.0)
@@ -71,42 +69,36 @@ class OllamaEmbedder(BaseEmbedder):
         return resp.json()["embeddings"][0]
 
 
-# ── Zhipu (cloud) ─────────────────────────────────────────────────────────────
+# ── Nomic (cloud, free) ───────────────────────────────────────────────────────
 
-class ZhipuEmbedder(BaseEmbedder):
+class NomicEmbedder(BaseEmbedder):
     """
-    Calls Zhipu AI embedding-3 API.
-    Passes `dimensions=EMBED_DIMENSIONS` so output matches the pgvector table
-    (default 768, same as nomic-embed-text — no re-indexing needed when switching).
+    Calls Nomic AI embedding API (free tier).
+    nomic-embed-text-v1.5 outputs 768 dims natively — matches pgvector table.
 
-    Docs: https://open.bigmodel.cn/dev/api/vector/embedding-3
+    Docs: https://docs.nomic.ai/reference/endpoints/nomic-embed-text
     """
 
-    _URL = "https://open.bigmodel.cn/api/paas/v4/embeddings"
+    _URL = "https://api-atlas.nomic.ai/v1/embedding/text"
 
     def __init__(self) -> None:
-        if not ZHIPU_API_KEY:
-            raise RuntimeError("ZHIPU_API_KEY is not set. Add it to your .env.")
+        if not NOMIC_API_KEY:
+            raise RuntimeError("NOMIC_API_KEY is not set. Add it to your .env.")
         self._headers = {
-            "Authorization": f"Bearer {ZHIPU_API_KEY}",
+            "Authorization": f"Bearer {NOMIC_API_KEY}",
             "Content-Type": "application/json",
         }
-        self._model = ZHIPU_EMBED_MODEL
-        self._dims = EMBED_DIMENSIONS
+        self._model = NOMIC_EMBED_MODEL
 
     def embed(self, text: str) -> list[float]:
         resp = httpx.post(
             self._URL,
-            json={"model": self._model, "input": text},
+            json={"model": self._model, "texts": [text], "task_type": "search_document"},
             headers=self._headers,
             timeout=_TIMEOUT,
         )
         resp.raise_for_status()
-        vector = resp.json()["data"][0]["embedding"]
-        # Zhipu embedding-3 returns 2048 dims by default — truncate to match pgvector table
-        if len(vector) > self._dims:
-            vector = vector[: self._dims]
-        return vector
+        return resp.json()["embeddings"][0]
 
 
 # ── Factory ───────────────────────────────────────────────────────────────────
@@ -115,9 +107,9 @@ def get_embedder() -> BaseEmbedder:
     provider = EMBED_PROVIDER.lower()
     if provider == "ollama":
         return OllamaEmbedder()
-    if provider == "zhipu":
-        return ZhipuEmbedder()
-    raise ValueError(f"Unknown EMBED_PROVIDER '{provider}'. Choices: ollama, zhipu")
+    if provider == "nomic":
+        return NomicEmbedder()
+    raise ValueError(f"Unknown EMBED_PROVIDER '{provider}'. Choices: ollama, nomic")
 
 
 # ── Public helpers (backwards-compatible) ─────────────────────────────────────
