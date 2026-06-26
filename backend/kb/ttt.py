@@ -200,7 +200,7 @@ def query_ttt(question: str, limit: int = 20, force_meetings: bool = False) -> s
         sql = """
             SELECT project_code, task_type, entry_date,
                    duration_minutes, meeting_title,
-                   LEFT(description, 400) AS description
+                   LEFT(description, 1000) AS description
             FROM time_entries
             WHERE task_type = 'meeting'
               AND entry_date BETWEEN %(start)s AND %(end)s
@@ -292,7 +292,7 @@ def query_ttt(question: str, limit: int = 20, force_meetings: bool = False) -> s
             )
         else:
             # Individual entry
-            desc = (row.get("description") or "")[:300].replace("\n", " ")
+            desc = (row.get("description") or "")[:800].replace("\n", " ")
             lines.append(
                 f"  [{row['entry_date']}] {row['project_code']} / {row['task_type']} | "
                 f"{mins:.0f} min | Billable: {row.get('billable', False)} | "
