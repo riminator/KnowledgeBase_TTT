@@ -18,12 +18,14 @@ from dataclasses import dataclass
 from kb.config import RAG_TOP_K
 from kb.llm import get_provider
 from kb.search import SearchResult, get_most_recent_meeting_date, search
+from kb.ttt import is_ttt_query, query_ttt
 
 SYSTEM_PROMPT = """\
-You are a helpful assistant with access to a personal knowledge base.
+You are a helpful assistant with access to a personal knowledge base and a \
+Time Task Tracker (TTT) database of logged work entries.
 Answer the user's question using ONLY the context passages provided below.
 If the answer is not in the context, say you don't have that information.
-Be concise and cite the source filename when relevant.
+Be concise and cite the source (filename or "Time Task Tracker") when relevant.
 
 Important: When the user asks about their "last meeting", "latest meeting", or \
 "most recent meeting", treat the context passages as the answer — they have \
@@ -91,9 +93,11 @@ def ask(
     if _is_temporal_meeting_query(question):
         most_recent_date = get_most_recent_meeting_date()
         if most_recent_date:
+            # Partition: chunks from the most-recent meeting first, rest after
             primary = [r for r in results if r.doc_metadata.get("meeting_date") == most_recent_date]
             secondary = [r for r in results if r.doc_metadata.get("meeting_date") != most_recent_date]
             results = primary + secondary
+            # If we got no semantic hits for the most-recent meeting, fetch more
             if not primary:
                 extra = search(
                     question,
@@ -105,8 +109,15 @@ def ask(
                 secondary = [r for r in extra if r.doc_metadata.get("meeting_date") != most_recent_date]
                 results = (primary + secondary)[:top_k]
 
-    # 2. Build context block
+    # 1c. TTT query — fetch structured time-entry data when relevant
+    ttt_context = ""
+    if is_ttt_query(question):
+        ttt_context = query_ttt(question)
+
+    # 2. Build context block — TTT results first (structured), then vector chunks
     context_parts = []
+    if ttt_context:
+        context_parts.append(ttt_context)
     for i, r in enumerate(results, 1):
         fname = r.source.split("/")[-1]
         date_label = f", date {r.doc_metadata['meeting_date']}" if r.doc_metadata.get("meeting_date") else ""

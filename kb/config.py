@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 
 # 1. Explicit override via KB_ENV_FILE env var
 # 2. Current working directory .env
-# 3. The hard-coded project root (works when installed with `pip install -e .`)
-_PROJECT_ROOT = pathlib.Path("/Users/akshaymallireddy/KnowledgeBase")
+# 3. Parent of this file (works when installed with `pip install -e .`)
+_PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
 _candidates = [
     os.environ.get("KB_ENV_FILE"),
     pathlib.Path.cwd() / ".env",
@@ -47,3 +47,7 @@ OPENAI_CHAT_MODEL: str = os.getenv("OPENAI_CHAT_MODEL", "llama-3.1-8b-instant")
 
 # RAG settings
 RAG_TOP_K: int = int(os.getenv("RAG_TOP_K", "5"))
+
+# ── Time Task Tracker ─────────────────────────────────────────────────────────
+TTT_DATABASE_URL: str = os.getenv("TTT_DATABASE_URL", "")
+TTT_PGSSL: bool = os.getenv("TTT_PGSSL", "true").lower() == "true"
