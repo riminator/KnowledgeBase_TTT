@@ -22,7 +22,18 @@ from typing import Generator
 
 import httpx
 
-from kb.config import OLLAMA_HOST, OLLAMA_CHAT_MODEL, LLM_PROVIDER, OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_CHAT_MODEL
+from kb.config import (
+    OLLAMA_HOST,
+    OLLAMA_CHAT_MODEL,
+    LLM_PROVIDER,
+    OPENAI_API_KEY,
+    OPENAI_BASE_URL,
+    OPENAI_CHAT_MODEL,
+    WATSONX_API_KEY,
+    WATSONX_MODEL_ID,
+    WATSONX_PROJECT_ID,
+    WATSONX_URL,
+)
 
 
 class BaseLLMProvider(abc.ABC):
@@ -102,6 +113,57 @@ class OpenAIProvider(BaseLLMProvider):
         return resp.json()["choices"][0]["message"]["content"]
 
 
+class WatsonxProvider(BaseLLMProvider):
+    """Calls watsonx.ai text generation endpoint via IAM auth."""
+
+    def __init__(self) -> None:
+        self._base = WATSONX_URL.rstrip("/")
+        self._model = WATSONX_MODEL_ID
+        self._project_id = WATSONX_PROJECT_ID
+        self._api_key = WATSONX_API_KEY
+
+    def _get_access_token(self) -> str:
+        resp = httpx.post(
+            "https://iam.cloud.ibm.com/identity/token",
+            data={
+                "grant_type": "urn:ibm:params:oauth:grant-type:apikey",
+                "apikey": self._api_key,
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=httpx.Timeout(30.0),
+        )
+        resp.raise_for_status()
+        return resp.json()["access_token"]
+
+    def chat(self, messages: list[dict], *, stream: bool = False) -> str:
+        if stream:
+            raise NotImplementedError("watsonx streaming is not implemented")
+
+        token = self._get_access_token()
+        prompt = "\n".join(f"{message['role']}: {message['content']}" for message in messages)
+        resp = httpx.post(
+            f"{self._base}/ml/v1/text/generation?version=2023-05-29",
+            json={
+                "model_id": self._model,
+                "project_id": self._project_id,
+                "input": prompt,
+                "parameters": {
+                    "decoding_method": "greedy",
+                    "max_new_tokens": 1024,
+                    "min_new_tokens": 1,
+                },
+            },
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            timeout=httpx.Timeout(120.0),
+        )
+        resp.raise_for_status()
+        return resp.json()["results"][0]["generated_text"]
+
+
 # ── Factory ───────────────────────────────────────────────────────────────────
 
 def get_provider() -> BaseLLMProvider:
@@ -111,4 +173,6 @@ def get_provider() -> BaseLLMProvider:
         return OllamaProvider()
     if provider == "openai":
         return OpenAIProvider()
-    raise ValueError(f"Unknown LLM_PROVIDER '{provider}'. Choices: ollama, openai")
+    if provider == "watsonx":
+        return WatsonxProvider()
+    raise ValueError(f"Unknown LLM_PROVIDER '{provider}'. Choices: ollama, openai, watsonx")
