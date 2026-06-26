@@ -146,8 +146,8 @@ _COUNT_WORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
 
 
 def _extract_count(question: str) -> int | None:
-    """Return an explicit meeting count from phrases like 'last two meetings' or 'last 3 meetings'."""
-    m = re.search(r"\blast\s+(\w+)\s+meetings?\b", question, re.IGNORECASE)
+    """Return an explicit count from phrases like 'last two meetings', 'last 3 entries', etc."""
+    m = re.search(r"\blast\s+(\w+)\s+\w+", question, re.IGNORECASE)
     if m:
         word = m.group(1).lower()
         if word.isdigit():
