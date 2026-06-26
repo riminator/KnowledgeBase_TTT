@@ -84,7 +84,7 @@ def ingest(path: str | pathlib.Path, *, force: bool = False) -> None:
                     progress.advance(task)
                     continue
 
-                file_type, chunks = extract(file_path)
+                file_type, chunks, doc_meta = extract(file_path)
 
                 if not chunks:
                     console.print(f"  [yellow]no text extracted:[/yellow] {file_path.name}")
@@ -104,6 +104,7 @@ def ingest(path: str | pathlib.Path, *, force: bool = False) -> None:
                         chunk_index=idx,
                         content=chunk,
                         embedding=vector,
+                        doc_metadata=doc_meta if doc_meta else None,
                     )
                     session.add(doc)
 
