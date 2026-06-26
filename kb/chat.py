@@ -39,8 +39,8 @@ Context:
 # ── temporal intent detection ────────────────────────────────────────────────
 
 _TEMPORAL_PATTERNS = re.compile(
-    r"\b(last|latest|most recent|recent|newest|previous)\b.{0,30}\b(meeting|standup|stand-up|call|sync|session)\b"
-    r"|\b(meeting|standup|stand-up|call|sync|session)\b.{0,30}\b(last|latest|most recent|recent|newest|previous)\b",
+    r"\b(last|latest|most recent|recent|newest|previous)\b.{0,40}\b(meeting|standup|stand-up|call|sync|session)s?\b"
+    r"|\b(meeting|standup|stand-up|call|sync|session)s?\b.{0,40}\b(last|latest|most recent|recent|newest|previous)\b",
     re.IGNORECASE,
 )
 
@@ -109,9 +109,14 @@ def ask(
                 secondary = [r for r in extra if r.doc_metadata.get("meeting_date") != most_recent_date]
                 results = (primary + secondary)[:top_k]
 
-    # 1c. TTT query — fetch structured time-entry data when relevant
+    # 1c. TTT query — fetch structured time-entry data when relevant.
+    # Temporal meeting queries (last meeting, last N meetings) always pull the
+    # TTT meeting list so the LLM has full history, not just what's in the
+    # vector KB.
     ttt_context = ""
-    if is_ttt_query(question):
+    if _is_temporal_meeting_query(question):
+        ttt_context = query_ttt(question, force_meetings=True)
+    elif is_ttt_query(question):
         ttt_context = query_ttt(question)
 
     # 2. Build context block — TTT results first (structured), then vector chunks

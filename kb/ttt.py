@@ -50,7 +50,12 @@ _MEETING_HISTORY_PATTERNS = re.compile(
     r"|\bhow many meetings?\b"
     r"|\bmeeting histor(y|ies)\b"
     r"|\bprevious meetings?\b"
-    r"|\bearlier meetings?\b",
+    r"|\bearlier meetings?\b"
+    # "last two/three/N meetings", "recent meetings", "summarize N meetings"
+    r"|\blast \w+ meetings?\b"
+    r"|\brecent meetings?\b"
+    r"|\b(two|three|four|five|2|3|4|5) meetings?\b"
+    r"|\bsummar\w+ \w* meetings?\b",
     re.IGNORECASE,
 )
 
@@ -110,10 +115,14 @@ def _extract_project(question: str) -> str | None:
         return None
     # group(1) = preposition match, group(2) = "X meeting" match
     val = (m.group(1) or m.group(2) or "").strip()
-    # Ignore common stop words that aren't project names
-    if val.lower() in {"the", "a", "an", "my", "this", "that", "last", "next",
-                        "previous", "prior", "earlier", "another", "other",
-                        "recent", "latest", "first", "second", "third"}:
+    # Ignore common stop words, numbers, and count words that aren't project names
+    _STOP = {
+        "the", "a", "an", "my", "this", "that", "last", "next",
+        "previous", "prior", "earlier", "another", "other",
+        "recent", "latest", "first", "second", "third",
+        "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+    }
+    if val.lower() in _STOP or val.isdigit():
         return None
     return val
 
@@ -132,10 +141,31 @@ def _get_conn():
     return psycopg2.connect(**kwargs)
 
 
-def query_ttt(question: str, limit: int = 20) -> str:
+_COUNT_WORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+                "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+
+
+def _extract_count(question: str) -> int | None:
+    """Return an explicit meeting count from phrases like 'last two meetings' or 'last 3 meetings'."""
+    m = re.search(r"\blast\s+(\w+)\s+meetings?\b", question, re.IGNORECASE)
+    if m:
+        word = m.group(1).lower()
+        if word.isdigit():
+            return int(word)
+        return _COUNT_WORDS.get(word)
+    return None
+
+
+def query_ttt(question: str, limit: int = 20, force_meetings: bool = False) -> str:
     """
     Run an appropriate SQL query against time_entries based on the question
     and return a formatted string suitable for use as LLM context.
+
+    Args:
+        question:       The user's natural-language question.
+        limit:          Max rows to return.
+        force_meetings: When True, always use the meeting-list query shape
+                        (used when called from a temporal meeting chat query).
 
     Returns an empty string if TTT_DATABASE_URL is not configured.
     """
@@ -149,6 +179,11 @@ def query_ttt(question: str, limit: int = 20) -> str:
     project    = _extract_project(question)
     q_lower    = question.lower()
 
+    # Honour explicit count in "last N meetings"
+    explicit_count = _extract_count(question)
+    if explicit_count:
+        limit = explicit_count
+
     # Default range: ±365 days from today when no temporal phrase found.
     # Wide window so queries work regardless of whether entries are dated in the
     # past or future (TTT entries may be pushed with server-local dates).
@@ -159,7 +194,7 @@ def query_ttt(question: str, limit: int = 20) -> str:
     params: dict[str, Any] = {"start": start, "end": end, "limit": limit}
 
     # ── choose query shape ────────────────────────────────────────────────────
-    if _MEETING_HISTORY_PATTERNS.search(question):
+    if force_meetings or _MEETING_HISTORY_PATTERNS.search(question):
         # List meeting entries with titles and dates so the LLM can reason about
         # which meetings exist and which came before/after others.
         sql = """
