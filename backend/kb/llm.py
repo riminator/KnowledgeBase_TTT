@@ -140,7 +140,12 @@ class WatsonxProvider(BaseLLMProvider):
             raise NotImplementedError("watsonx streaming is not implemented")
 
         token = self._get_access_token()
-        prompt = "\n".join(f"{message['role']}: {message['content']}" for message in messages)
+        prompt = "<|begin_of_text|>"
+        for message in messages:
+            role = "assistant" if message["role"] == "assistant" else "user"
+            prompt += f"<|start_header_id|>{role}<|end_header_id|>\n{message['content']}<|eot_id|>"
+        prompt += "<|start_header_id|>assistant<|end_header_id|>\n"
+
         resp = httpx.post(
             f"{self._base}/ml/v1/text/generation?version=2023-05-29",
             json={
@@ -151,6 +156,7 @@ class WatsonxProvider(BaseLLMProvider):
                     "decoding_method": "greedy",
                     "max_new_tokens": 1024,
                     "min_new_tokens": 1,
+                    "stop_sequences": ["<|eot_id|>"],
                 },
             },
             headers={
@@ -161,7 +167,7 @@ class WatsonxProvider(BaseLLMProvider):
             timeout=httpx.Timeout(120.0),
         )
         resp.raise_for_status()
-        return resp.json()["results"][0]["generated_text"]
+        return resp.json()["results"][0]["generated_text"].strip()
 
 
 # ── Factory ───────────────────────────────────────────────────────────────────
