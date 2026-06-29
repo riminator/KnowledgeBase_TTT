@@ -12,6 +12,7 @@ from __future__ import annotations
 import pathlib
 import shutil
 import tempfile
+from datetime import date
 from typing import Annotated
 
 import httpx
@@ -215,6 +216,18 @@ def summarize_meeting(req: SummarizeMeetingRequest) -> IngestMeetingResponse:
             )
         raise
 
+    # Pull meeting date from the indexed doc_metadata if present.
+    # Do a targeted search scoped to the filename and grab the first chunk's metadata.
+    entry_date: date | None = None
+    try:
+        meta_hits = kb_search(req.filename, top_k=1, source_filter=req.filename)
+        if meta_hits:
+            raw_date = meta_hits[0].doc_metadata.get("meeting_date")
+            if raw_date:
+                entry_date = date.fromisoformat(raw_date)
+    except Exception:
+        pass  # non-fatal — falls back to today
+
     ttt_id: str | None = None
     ttt_error: str | None = None
     try:
@@ -224,6 +237,7 @@ def summarize_meeting(req: SummarizeMeetingRequest) -> IngestMeetingResponse:
             project_code=req.project_code or None,
             organizer=req.organizer or None,
             attendees=req.attendees or None,
+            entry_date=entry_date,
         )
         ttt_id = pushed.get("id")
     except Exception as exc:
