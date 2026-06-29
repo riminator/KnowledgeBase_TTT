@@ -216,28 +216,43 @@ def summarize_meeting(req: SummarizeMeetingRequest) -> IngestMeetingResponse:
             )
         raise
 
-    # Pull meeting date from the indexed doc_metadata if present.
-    # Do a targeted search scoped to the filename and grab the first chunk's metadata.
-    entry_date: date | None = None
+    # Pull all header metadata from the indexed doc_metadata.
+    # Prefer values from the file header; fall back to what was passed in the request.
+    file_meta: dict = {}
     try:
         meta_hits = kb_search(req.filename, top_k=1, source_filter=req.filename)
         if meta_hits:
-            raw_date = meta_hits[0].doc_metadata.get("meeting_date")
-            if raw_date:
-                entry_date = date.fromisoformat(raw_date)
+            file_meta = meta_hits[0].doc_metadata or {}
     except Exception:
-        pass  # non-fatal — falls back to today
+        pass  # non-fatal
+
+    entry_date: date | None = None
+    raw_date = file_meta.get("meeting_date")
+    if raw_date:
+        try:
+            entry_date = date.fromisoformat(raw_date)
+        except ValueError:
+            pass
+
+    duration_minutes: float | None = file_meta.get("duration_minutes")
+    project_code = req.project_code or file_meta.get("project_code") or None
+    organizer    = req.organizer    or file_meta.get("organizer")    or None
+    attendees    = req.attendees    or file_meta.get("attendees")    or None
+    meeting_title = file_meta.get("meeting_title") or req.filename
+    billable      = file_meta.get("billable", False)
 
     ttt_id: str | None = None
     ttt_error: str | None = None
     try:
         pushed = push_meeting_entry(
-            filename=req.filename,
+            filename=meeting_title,
             summary=rag_result.answer,
-            project_code=req.project_code or None,
-            organizer=req.organizer or None,
-            attendees=req.attendees or None,
+            project_code=project_code,
+            organizer=organizer,
+            attendees=attendees,
             entry_date=entry_date,
+            duration_minutes=duration_minutes,
+            billable=billable,
         )
         ttt_id = pushed.get("id")
     except Exception as exc:

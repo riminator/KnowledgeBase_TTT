@@ -82,6 +82,7 @@ def push_meeting_entry(
     project_code: str | None = None,
     organizer: str | None = None,
     attendees: str | None = None,
+    billable: bool = False,
 ) -> dict:
     """
     Insert one row into TTT's time_entries table.
@@ -89,15 +90,16 @@ def push_meeting_entry(
     Returns the inserted row as a dict, or raises on failure.
 
     Args:
-        filename:         Original filename (used as meeting_title and fallback project).
+        filename:         Meeting title (from header) or filename fallback.
         summary:          Full LLM-generated summary text.
         entry_date:       Date of the meeting (defaults to today).
-        duration_minutes: Override duration; auto-parsed from summary if None.
-        project_code:     Override project; auto-parsed from summary if None.
-        organizer:        Optional organiser email/name.
-        attendees:        Optional comma-separated attendee list.
+        duration_minutes: From header or auto-parsed from summary.
+        project_code:     From header, request, or parsed from summary.
+        organizer:        From header or request.
+        attendees:        From header or request.
+        billable:         From header Billable field (default False).
     """
-    today = entry_date or date.today()
+    today    = entry_date or date.today()
     duration = duration_minutes if duration_minutes is not None else _parse_duration_minutes(summary)
     project  = project_code or _parse_project(summary, filename)
 
@@ -109,7 +111,7 @@ def push_meeting_entry(
         "entry_date":       today.isoformat(),
         "description":      summary,
         "meeting_title":    filename,
-        "billable":         False,
+        "billable":         billable,
         "confidence":       0.75,
         "status":           "logged",
         "organizer":        organizer,

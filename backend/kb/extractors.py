@@ -36,11 +36,15 @@ CHUNK_OVERLAP = 100     # overlap between consecutive chunks
 
 # Patterns for the structured header block at the top of meeting transcripts.
 _HEADER_FIELDS = {
-    "meeting_date":  re.compile(r"^Date:\s*(.+)", re.IGNORECASE | re.MULTILINE),
-    "meeting_title": re.compile(r"^Meeting Title:\s*(.+)", re.IGNORECASE | re.MULTILINE),
-    "organizer":     re.compile(r"^Organizer:\s*(.+)", re.IGNORECASE | re.MULTILINE),
-    "attendees":     re.compile(r"^Attendees:\s*(.+)", re.IGNORECASE | re.MULTILINE),
-    "platform":      re.compile(r"^Platform:\s*(.+)", re.IGNORECASE | re.MULTILINE),
+    "meeting_date":      re.compile(r"^Date:\s*(.+)", re.IGNORECASE | re.MULTILINE),
+    "meeting_title":     re.compile(r"^Meeting Title:\s*(.+)", re.IGNORECASE | re.MULTILINE),
+    "organizer":         re.compile(r"^Organizer:\s*(.+)", re.IGNORECASE | re.MULTILINE),
+    "attendees":         re.compile(r"^Attendees:\s*(.+)", re.IGNORECASE | re.MULTILINE),
+    "platform":          re.compile(r"^Platform:\s*(.+)", re.IGNORECASE | re.MULTILINE),
+    "meeting_time":      re.compile(r"^Time:\s*(.+)", re.IGNORECASE | re.MULTILINE),
+    "project_code":      re.compile(r"^Project(?:\s+Code)?:\s*(.+)", re.IGNORECASE | re.MULTILINE),
+    "billable":          re.compile(r"^Billable:\s*(.+)", re.IGNORECASE | re.MULTILINE),
+    "duration_minutes":  re.compile(r"^Meeting Duration:\s*(.+)", re.IGNORECASE | re.MULTILINE),
 }
 
 
@@ -57,7 +61,7 @@ def extract_meeting_metadata(text: str) -> dict:
         if m:
             meta[key] = m.group(1).strip()
 
-    # Normalise the date to ISO format for easy comparison
+    # Normalise date to ISO format
     if "meeting_date" in meta:
         raw_date = meta["meeting_date"]
         for fmt in ("%Y-%m-%d", "%B %d, %Y", "%b %d, %Y", "%m/%d/%Y", "%d/%m/%Y"):
@@ -68,6 +72,20 @@ def extract_meeting_metadata(text: str) -> dict:
                 break
             except ValueError:
                 continue
+
+    # Normalise billable to bool
+    if "billable" in meta:
+        meta["billable"] = meta["billable"].strip().lower() in ("yes", "true", "1")
+
+    # Normalise duration_minutes to float — parse "32 minutes", "1 hour", etc.
+    if "duration_minutes" in meta:
+        raw_dur = meta["duration_minutes"]
+        minutes = 0.0
+        for m in re.finditer(r"(\d+(?:\.\d+)?)\s*(?:hour|hr|h)\b", raw_dur, re.IGNORECASE):
+            minutes += float(m.group(1)) * 60
+        for m in re.finditer(r"(\d+(?:\.\d+)?)\s*(?:minute|min|m)\b", raw_dur, re.IGNORECASE):
+            minutes += float(m.group(1))
+        meta["duration_minutes"] = minutes if minutes else None
 
     return meta
 
