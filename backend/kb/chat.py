@@ -69,6 +69,7 @@ def ask(
     top_k: int = RAG_TOP_K,
     source_filter: str | None = None,
     file_type: str | None = None,
+    skip_ttt: bool = False,
 ) -> ChatResponse:
     """
     Run the RAG pipeline for a single question.
@@ -113,11 +114,14 @@ def ask(
     # Temporal meeting queries (last meeting, last N meetings) always pull the
     # TTT meeting list so the LLM has full history, not just what's in the
     # vector KB.
+    # skip_ttt=True is used during meeting summarization to avoid injecting
+    # unrelated historical entries into the summary context.
     ttt_context = ""
-    if _is_temporal_meeting_query(question):
-        ttt_context = query_ttt(question, force_meetings=True)
-    elif is_ttt_query(question):
-        ttt_context = query_ttt(question)
+    if not skip_ttt:
+        if _is_temporal_meeting_query(question):
+            ttt_context = query_ttt(question, force_meetings=True)
+        elif is_ttt_query(question):
+            ttt_context = query_ttt(question)
 
     # 2. Build context block — TTT results first (structured), then vector chunks
     context_parts = []
