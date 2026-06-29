@@ -238,7 +238,9 @@ def summarize_meeting(req: SummarizeMeetingRequest) -> IngestMeetingResponse:
     project_code = req.project_code or file_meta.get("project_code") or None
     organizer    = req.organizer    or file_meta.get("organizer")    or None
     attendees    = req.attendees    or file_meta.get("attendees")    or None
-    meeting_title = file_meta.get("meeting_title") or req.filename
+    raw_title     = file_meta.get("meeting_title") or req.filename
+    meeting_time  = file_meta.get("meeting_time")
+    meeting_title = f"{raw_title} ({meeting_time})" if meeting_time else raw_title
     billable      = file_meta.get("billable", False)
 
     ttt_id: str | None = None
