@@ -174,19 +174,22 @@ class WatsonxProvider(BaseLLMProvider):
                 return resp.json()["choices"][0]["message"]["content"].strip()
 
             # 429 — respect Retry-After if present, else exponential backoff + jitter
+            retry_after = resp.headers.get("Retry-After")
+            print(f"[watsonx] 429 on attempt {attempt + 1}/{max_retries}. Retry-After={retry_after!r} headers={dict(resp.headers)}")
+
             if attempt == max_retries - 1:
                 resp.raise_for_status()  # re-raise on final attempt
 
-            retry_after = resp.headers.get("Retry-After")
             if retry_after and retry_after.isdigit():
                 delay = float(retry_after)
             else:
                 delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
 
+            print(f"[watsonx] sleeping {delay:.1f}s before retry {attempt + 2}")
             time.sleep(delay)
 
-        # unreachable, but satisfies type checker
-        raise httpx.HTTPStatusError("max retries exceeded", request=resp.request, response=resp)
+        # unreachable — the final attempt always raises inside the loop
+        raise RuntimeError("max retries exceeded")  # pragma: no cover
 
 
 # ── Factory ───────────────────────────────────────────────────────────────────

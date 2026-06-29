@@ -30,3 +30,5 @@ services:
         sync: false
       - key: TTT_PGSSL
         value: "true"
+      - key: WATSONX_MODEL_ID
+        value: ibm/granite-3-3-8b-instruct
