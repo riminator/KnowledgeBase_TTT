@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getSummary, getEntries } from "../tttApi";
+import { getEntries } from "../tttApi";
 
 function StatCard({ label, value, sub }) {
   return (
@@ -34,15 +34,34 @@ export default function TTTDashboard({ token }) {
     async function load() {
       setLoading(true); setError(null);
       try {
+        // Fetch all entries — no date filter on dashboard so everything shows
+        const entries = await getEntries({}, token);
+        setRecent(entries.slice(0, 8));
+
+        // Compute summary client-side from the entries for this month
         const now   = new Date();
         const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
         const end   = now.toISOString().split("T")[0];
-        const [s, entries] = await Promise.all([
-          getSummary({ startDate: start, endDate: end }, token),
-          getEntries({}, token),
-        ]);
-        setSummary(s);
-        setRecent(entries.slice(0, 8));
+        const monthEntries = entries.filter(e => e.date >= start && e.date <= end);
+        const totalMin    = monthEntries.reduce((s, e) => s + e.durationMinutes, 0);
+        const billableMin = monthEntries.filter(e => e.billable).reduce((s, e) => s + e.durationMinutes, 0);
+        const projects    = [...new Set(monthEntries.map(e => e.projectCode))];
+        const byProject   = Object.entries(
+          monthEntries.reduce((acc, e) => {
+            acc[e.projectCode] = (acc[e.projectCode] || 0) + e.durationMinutes;
+            return acc;
+          }, {})
+        )
+          .sort((a, b) => b[1] - a[1])
+          .map(([project, mins]) => ({ project, hours: mins / 60 }));
+
+        setSummary({
+          totalHours:    totalMin / 60,
+          billableHours: billableMin / 60,
+          totalEntries:  monthEntries.length,
+          projectCount:  projects.length,
+          byProject,
+        });
       } catch (e) {
         setError(e.message);
       } finally {

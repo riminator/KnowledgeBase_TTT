@@ -3,6 +3,17 @@ import { createEntry, classifyMeeting, getProjects } from "../tttApi";
 
 const TASK_TYPES = ["meeting","development","planning","review","admin","learning","other"];
 
+function Field({ label, required, children }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <label style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+        {label}{required && " *"}
+      </label>
+      {children}
+    </div>
+  );
+}
+
 export default function TTTManualEntry({ token }) {
   const [projects, setProjects] = useState([]);
   const [form, setForm] = useState({
@@ -40,6 +51,7 @@ export default function TTTManualEntry({ token }) {
 
   async function handleClassify() {
     if (!form.title) { setError("Enter a title first."); return; }
+    setError(null);
     try {
       const cl = await classifyMeeting(form.title, form.organizer || null, token);
       setForm(f => ({ ...f, project: cl.projectCode, taskType: cl.taskType, billable: cl.billable }));
@@ -54,115 +66,118 @@ export default function TTTManualEntry({ token }) {
         date:            form.date,
         durationMinutes: parseFloat(form.duration) * 60,
         meetingTitle:    form.title,
-        projectCode:     form.project,
+        projectCode:     form.project || "GENERAL",
         taskType:        form.taskType,
         billable:        form.billable,
-        description:     form.description,
-        organizer:       form.organizer || null,
-        attendees:       form.attendees || null,
+        description:     form.description || null,
+        organizer:       form.organizer   || null,
+        attendees:       form.attendees   || null,
         startTime:       form.startTime ? `${form.date}T${form.startTime}:00Z` : null,
         endTime:         form.endTime   ? `${form.date}T${form.endTime}:00Z`   : null,
         confidence:      0.75,
         status:          "logged",
       }, token);
       setSuccess(true);
-      setForm(f => ({ ...f, title: "", description: "", organizer: "", attendees: "", startTime: "", endTime: "", duration: "" }));
+      setForm(f => ({ ...f, title: "", description: "", organizer: "", attendees: "", startTime: "", endTime: "", duration: "", project: "" }));
     } catch (e) { setError(e.message); }
     finally { setSaving(false); }
   }
 
+  const row = { display: "grid", gap: 12 };
+
   return (
-    <div className="card">
+    <div className="card" style={{ maxWidth: 700 }}>
       <h2 className="section-title">Add Manual Time Entry</h2>
-      <form onSubmit={handleSubmit}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
-          <div>
-            <label className="filter-label">Date *</label>
-            <input type="date" className="input" value={form.date} onChange={e => set("date", e.target.value)} required />
-          </div>
-          <div>
-            <label className="filter-label">Start time</label>
+      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+        {/* Row 1 — date + times + duration */}
+        <div style={{ ...row, gridTemplateColumns: "1fr 1fr 1fr 1fr" }}>
+          <Field label="Date" required>
+            <input type="date" className="input" value={form.date}
+              onChange={e => set("date", e.target.value)} required />
+          </Field>
+          <Field label="Start time">
             <input type="time" className="input" value={form.startTime}
               onChange={e => { set("startTime", e.target.value); calcDuration(e.target.value, form.endTime); }} />
-          </div>
-          <div>
-            <label className="filter-label">End time</label>
+          </Field>
+          <Field label="End time">
             <input type="time" className="input" value={form.endTime}
               onChange={e => { set("endTime", e.target.value); calcDuration(form.startTime, e.target.value); }} />
-          </div>
-          <div>
-            <label className="filter-label">Duration (hrs) *</label>
+          </Field>
+          <Field label="Duration (hrs)" required>
             <input type="number" className="input" step="0.25" min="0.25" value={form.duration}
               onChange={e => set("duration", e.target.value)} required />
-          </div>
+          </Field>
         </div>
 
-        <div style={{ marginTop: 10 }}>
-          <label className="filter-label">Meeting / Task title *</label>
+        {/* Row 2 — title + classify */}
+        <Field label="Meeting / Task title" required>
           <div style={{ display: "flex", gap: 8 }}>
-            <input type="text" className="input" value={form.title} onChange={e => set("title", e.target.value)}
-              placeholder="e.g., Sprint Planning Meeting" required />
-            <button type="button" className="btn btn-outline" style={{ whiteSpace: "nowrap" }} onClick={handleClassify}>
+            <input type="text" className="input" value={form.title}
+              onChange={e => set("title", e.target.value)}
+              placeholder="e.g., Sprint Planning Meeting" required
+              style={{ flex: 1 }} />
+            <button type="button" className="btn btn-outline" style={{ whiteSpace: "nowrap", flexShrink: 0 }}
+              onClick={handleClassify}>
               Auto-classify
             </button>
           </div>
-        </div>
+        </Field>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginTop: 10 }}>
-          <div>
-            <label className="filter-label">Project *</label>
+        {/* Row 3 — project + task type + billable */}
+        <div style={{ ...row, gridTemplateColumns: "1fr 1fr 1fr" }}>
+          <Field label="Project" required>
             <input type="text" className="input" list="ttt-projects" value={form.project}
               onChange={e => set("project", e.target.value)} placeholder="e.g., Honda" required />
             <datalist id="ttt-projects">
               {projects.map(p => <option key={p} value={p} />)}
             </datalist>
-          </div>
-          <div>
-            <label className="filter-label">Task type</label>
+          </Field>
+          <Field label="Task type">
             <select className="select" value={form.taskType} onChange={e => set("taskType", e.target.value)}>
               {TASK_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
-          </div>
-          <div>
-            <label className="filter-label">Billable</label>
+          </Field>
+          <Field label="Billable">
             <select className="select" value={form.billable ? "true" : "false"}
               onChange={e => set("billable", e.target.value === "true")}>
               <option value="false">No</option>
               <option value="true">Yes</option>
             </select>
-          </div>
+          </Field>
         </div>
 
-        <div style={{ marginTop: 10 }}>
-          <label className="filter-label">Description</label>
+        {/* Row 4 — description */}
+        <Field label="Description">
           <textarea className="input" rows={3} value={form.description}
             onChange={e => set("description", e.target.value)} placeholder="Additional notes…" />
-        </div>
+        </Field>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
-          <div>
-            <label className="filter-label">Organizer</label>
+        {/* Row 5 — organizer + attendees */}
+        <div style={{ ...row, gridTemplateColumns: "1fr 1fr" }}>
+          <Field label="Organizer">
             <input type="email" className="input" value={form.organizer}
               onChange={e => set("organizer", e.target.value)} placeholder="organizer@company.com" />
-          </div>
-          <div>
-            <label className="filter-label">Attendees</label>
+          </Field>
+          <Field label="Attendees">
             <input type="text" className="input" value={form.attendees}
               onChange={e => set("attendees", e.target.value)} placeholder="Comma-separated" />
-          </div>
+          </Field>
         </div>
 
-        {error   && <p style={{ color: "var(--danger)", marginTop: 10, fontSize: 13 }}>{error}</p>}
-        {success && <p style={{ color: "var(--success)", marginTop: 10, fontSize: 13 }}>Entry saved successfully.</p>}
+        {error   && <p style={{ color: "var(--danger)",  fontSize: 13, margin: 0 }}>{error}</p>}
+        {success && <p style={{ color: "var(--success)", fontSize: 13, margin: 0 }}>Entry saved successfully.</p>}
 
-        <div className="upload-actions" style={{ marginTop: 14 }}>
+        <div style={{ display: "flex", gap: 8 }}>
           <button type="submit" className="btn btn-primary" disabled={saving}>
             {saving ? "Saving…" : "Save Entry"}
           </button>
-          <button type="reset" className="btn btn-outline" onClick={() => { setSuccess(false); setError(null); }}>
+          <button type="button" className="btn btn-outline"
+            onClick={() => { setSuccess(false); setError(null); setForm(f => ({ ...f, title: "", description: "", organizer: "", attendees: "", startTime: "", endTime: "", duration: "", project: "" })); }}>
             Reset
           </button>
         </div>
+
       </form>
     </div>
   );
