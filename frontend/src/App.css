@@ -88,7 +88,15 @@ body {
 }
 .logo span { color: #60a5fa; }
 
-.tabs { display: flex; gap: 2px; }
+.tabs { display: flex; gap: 2px; align-items: center; flex-wrap: wrap; }
+.tab-divider {
+  width: 1px;
+  height: 20px;
+  background: #334155;
+  margin: 0 6px;
+}
+.ttt-tab { color: #a3e6c8 !important; }
+.ttt-tab.active { background: #134e38 !important; color: #34d399 !important; }
 .tab-btn {
   background: none;
   border: none;

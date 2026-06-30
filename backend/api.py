@@ -31,6 +31,7 @@ from kb.ingest import ingest
 from kb.pusher import push_meeting_entry
 from kb.search import delete_source, list_sources
 from kb.search import search as kb_search
+from ttt_api import router as ttt_router
 
 # ── app setup ────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+app.include_router(ttt_router)
 
 
 @app.on_event("startup")
