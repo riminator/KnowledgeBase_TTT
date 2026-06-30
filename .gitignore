@@ -40,3 +40,4 @@ sample_meeting*.txt
 openshift/secret.yaml
 
 testopenshift/test
+openshift/deploy.env
