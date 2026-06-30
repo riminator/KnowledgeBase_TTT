@@ -33,3 +33,6 @@ frontend/dist/
 
 # Bob AI workspace
 .bob/
+
+# Sample / test meeting files
+sample_meeting*.txt
