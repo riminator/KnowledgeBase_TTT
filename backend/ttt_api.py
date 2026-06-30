@@ -322,15 +322,15 @@ def _insert_entries(entries: list[dict], user_id: str, conn) -> tuple[int, int]:
     return inserted, failed
 
 
-# ── Routes ────────────────────────────────────────────────────────────────────
+# ── Internal query helper (used by routes + summary/export) ──────────────────
 
-@router.get("/entries")
-def list_entries(
-    start_date:   str | None = Query(None),
-    end_date:     str | None = Query(None),
-    project_code: str | None = Query(None),
-    user_id: str = Depends(get_current_user),
+def _fetch_entries(
+    user_id: str,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    project_code: str | None = None,
 ) -> list[dict]:
+    """Shared DB query — all routes use this instead of calling each other."""
     conn = _get_conn()
     try:
         conditions = ["user_id = %s"]
@@ -347,6 +347,18 @@ def list_entries(
             return [_row_to_dict(r) for r in cur.fetchall()]
     finally:
         conn.close()
+
+
+# ── Routes ────────────────────────────────────────────────────────────────────
+
+@router.get("/entries")
+def list_entries(
+    start_date:   str | None = Query(None),
+    end_date:     str | None = Query(None),
+    project_code: str | None = Query(None),
+    user_id: str = Depends(get_current_user),
+) -> list[dict]:
+    return _fetch_entries(user_id, start_date, end_date, project_code)
 
 
 @router.post("/entries/bulk-delete")
@@ -486,7 +498,7 @@ def get_summary(
     end_date:   str | None = Query(None),
     user_id: str = Depends(get_current_user),
 ) -> dict:
-    entries = list_entries(start_date=start_date, end_date=end_date, user_id=user_id)
+    entries = _fetch_entries(user_id, start_date, end_date)
 
     total_min    = sum(e["durationMinutes"] for e in entries)
     billable_min = sum(e["durationMinutes"] for e in entries if e["billable"])
@@ -543,7 +555,7 @@ def export_csv(
     end_date:   str | None = Query(None),
     user_id: str = Depends(get_current_user),
 ):
-    entries = list_entries(start_date=start_date, end_date=end_date, user_id=user_id)
+    entries = _fetch_entries(user_id, start_date, end_date)
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["ID", "Date", "Project Code", "Task Type", "Duration (minutes)",
