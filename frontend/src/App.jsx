@@ -29,23 +29,28 @@ export default function App() {
     <div className="app">
       <header className="header">
         <div className="header-inner">
-          <h1 className="logo">🗂 Knowledge<span>Base</span></h1>
-          <nav className="tabs">
-            {KB_TABS.map(t => (
-              <button key={t} className={`tab-btn ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>
-                {t}
-              </button>
-            ))}
-            <span className="tab-divider" />
-            {TTT_TABS.map(t => (
-              <button key={t} className={`tab-btn ttt-tab ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>
-                {t}
-              </button>
-            ))}
-          </nav>
-          <div className="user-bar">
-            <span className="user-email">{session.user.email}</span>
-            <button className="logout-btn" onClick={() => supabase.auth.signOut()}>Sign out</button>
+          <div className="header-row1">
+            <h1 className="logo">🗂 Knowledge<span>Base</span></h1>
+            <nav className="tabs-kb">
+              {KB_TABS.map(t => (
+                <button key={t} className={`tab-btn ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>
+                  {t}
+                </button>
+              ))}
+            </nav>
+            <div className="user-bar">
+              <span className="user-email">{session.user.email}</span>
+              <button className="logout-btn" onClick={() => supabase.auth.signOut()}>Sign out</button>
+            </div>
+          </div>
+          <div className="header-row2">
+            <nav className="tabs-ttt">
+              {TTT_TABS.map(t => (
+                <button key={t} className={`tab-btn ttt-tab ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>
+                  {t}
+                </button>
+              ))}
+            </nav>
           </div>
         </div>
       </header>
