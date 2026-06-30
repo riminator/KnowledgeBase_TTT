@@ -8,7 +8,7 @@ function formatBytes(b) {
   return `${(b / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default function Upload() {
+export default function Upload({ token }) {
   const [files, setFiles] = useState([]);   // [{ file, status, error }]
   const [force, setForce] = useState(false);
 
@@ -32,7 +32,7 @@ export default function Upload() {
         prev.map((f) => (f.file === item.file ? { ...f, status: "uploading" } : f))
       );
       try {
-        await uploadFile(item.file, force);
+        await uploadFile(item.file, force, token);
         setFiles((prev) =>
           prev.map((f) => (f.file === item.file ? { ...f, status: "done" } : f))
         );

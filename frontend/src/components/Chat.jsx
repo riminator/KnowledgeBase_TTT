@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { chatWithKB } from "../api";
 
-export default function Chat() {
+export default function Chat({ token }) {
   const [messages, setMessages]   = useState([]);  // {role, content, sources?}
   const [input, setInput]         = useState("");
   const [loading, setLoading]     = useState(false);
@@ -26,7 +26,7 @@ export default function Chat() {
     setError(null);
 
     try {
-      const data = await chatWithKB({ question, history });
+      const data = await chatWithKB({ question, history }, token);
       setMessages(prev => [
         ...prev,
         { role: "assistant", content: data.answer, sources: data.sources },

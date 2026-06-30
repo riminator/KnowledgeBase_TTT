@@ -39,13 +39,20 @@ def _iter_files(root: pathlib.Path) -> Generator[pathlib.Path, None, None]:
             yield path
 
 
-def _already_indexed(session, source: str) -> bool:
-    return session.execute(
-        select(Document.id).where(Document.source == source).limit(1)
-    ).first() is not None
+def _already_indexed(session, source: str, *, user_id: str | None = None) -> bool:
+    stmt = select(Document.id).where(Document.source == source)
+    if user_id:
+        stmt = stmt.where(Document.user_id == user_id)
+    return session.execute(stmt.limit(1)).first() is not None
 
 
-def ingest(path: str | pathlib.Path, *, force: bool = False, source_name: str | None = None) -> None:
+def ingest(
+    path: str | pathlib.Path,
+    *,
+    force: bool = False,
+    source_name: str | None = None,
+    user_id: str | None = None,
+) -> None:
     """
     Ingest a single file or every supported file inside a directory.
 
@@ -55,6 +62,8 @@ def ingest(path: str | pathlib.Path, *, force: bool = False, source_name: str | 
         source_name: Override the source key stored in the DB (e.g. the
                      original upload filename instead of a temp path).
                      Only used when *path* resolves to a single file.
+        user_id:     Supabase user UUID to scope the document to. When set,
+                     dedup check is also scoped to this user.
     """
     init_db()
     root = pathlib.Path(path).expanduser().resolve()
@@ -84,7 +93,7 @@ def ingest(path: str | pathlib.Path, *, force: bool = False, source_name: str | 
                 # file so the DB key is the original filename, not a temp path.
                 source_key = source_name if (source_name and len(files) == 1) else str(file_path)
 
-                if not force and _already_indexed(session, source_key):
+                if not force and _already_indexed(session, source_key, user_id=user_id):
                     console.print(f"  [dim]skip (already indexed):[/dim] {file_path.name}")
                     progress.advance(task)
                     continue
@@ -98,12 +107,16 @@ def ingest(path: str | pathlib.Path, *, force: bool = False, source_name: str | 
 
                 # Remove old records when force re-indexing
                 if force:
-                    session.query(Document).filter(Document.source == source_key).delete()
+                    q = session.query(Document).filter(Document.source == source_key)
+                    if user_id:
+                        q = q.filter(Document.user_id == user_id)
+                    q.delete()
                     session.commit()
 
                 for idx, chunk in enumerate(chunks):
                     vector = embed(chunk)
                     doc = Document(
+                        user_id=user_id,
                         source=source_key,
                         file_type=file_type,
                         chunk_index=idx,

@@ -1,6 +1,8 @@
 psycopg2-binary>=2.9.9
 pgvector>=0.2.5
 sqlalchemy>=2.0.30
+PyJWT>=2.8.0
+cryptography>=42.0.0
 
 # document extraction
 pypdf>=4.2.0

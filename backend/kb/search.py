@@ -139,9 +139,10 @@ def search(
     top_k: int = 5,
     file_type: str | None = None,
     source_filter: str | None = None,
+    user_id: str | None = None,
 ) -> list[SearchResult]:
     """
-    Embed *query* with Ollama and return the *top_k* most similar chunks.
+    Embed *query* and return the *top_k* most similar chunks.
 
     Args:
         query:         Natural-language search query.
@@ -149,6 +150,7 @@ def search(
         file_type:     Optional filter — only return chunks from this file type
                        (e.g. ``"pdf"``, ``"image"``).
         source_filter: Optional substring filter on the source file path.
+        user_id:       When set, restrict results to this user's documents only.
     """
     init_db()
     query_vector = embed(query)
@@ -165,6 +167,8 @@ def search(
             .limit(top_k)
         )
 
+        if user_id:
+            stmt = stmt.where(Document.user_id == user_id)
         if file_type:
             stmt = stmt.where(Document.file_type == file_type)
         if source_filter:
@@ -189,7 +193,7 @@ def search(
         session.close()
 
 
-def get_most_recent_meeting_date() -> str | None:
+def get_most_recent_meeting_date(*, user_id: str | None = None) -> str | None:
     """
     Return the ISO-8601 date string of the most recently indexed meeting,
     or None if no meetings with a parsed date are in the database.
@@ -197,48 +201,57 @@ def get_most_recent_meeting_date() -> str | None:
     init_db()
     session = get_session()
     try:
+        user_filter = "AND user_id = :user_id" if user_id else ""
         rows = session.execute(
             text(
-                """
+                f"""
                 SELECT DISTINCT doc_metadata->>'meeting_date' AS meeting_date
                 FROM documents
                 WHERE doc_metadata->>'meeting_date' IS NOT NULL
+                {user_filter}
                 ORDER BY doc_metadata->>'meeting_date' DESC
                 LIMIT 1
                 """
-            )
+            ),
+            {"user_id": user_id} if user_id else {},
         ).all()
         return rows[0].meeting_date if rows else None
     finally:
         session.close()
 
 
-def list_sources() -> list[dict]:
+def list_sources(*, user_id: str | None = None) -> list[dict]:
     """Return a summary of every unique source file currently in the database."""
     init_db()
     session = get_session()
     try:
+        user_filter = "AND user_id = :user_id" if user_id else ""
         rows = session.execute(
             text(
-                """
+                f"""
                 SELECT source, file_type, COUNT(*) AS chunks
                 FROM documents
+                WHERE 1=1 {user_filter}
                 GROUP BY source, file_type
                 ORDER BY source
                 """
-            )
+            ),
+            {"user_id": user_id} if user_id else {},
         ).all()
         return [{"source": r.source, "file_type": r.file_type, "chunks": r.chunks} for r in rows]
     finally:
         session.close()
 
 
-def delete_source(source: str) -> int:
+def delete_source(source: str, *, user_id: str | None = None) -> int:
     """Delete all chunks for a given *source* path. Returns rows deleted."""
     init_db()
     session = get_session()
     try:
-        deleted = session.query(Document).filter(Document.source == source).delete()
+        q = session.query(Document).filter(Document.source == source)
+        if user_id:
+            q = q.filter(Document.user_id == user_id)
+        deleted = q.delete()
         session.commit()
         return deleted
     except Exception:

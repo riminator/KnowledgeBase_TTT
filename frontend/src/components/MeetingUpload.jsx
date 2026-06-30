@@ -8,7 +8,7 @@ function formatBytes(b) {
   return `${(b / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default function MeetingUpload() {
+export default function MeetingUpload({ token }) {
   const [file, setFile]             = useState(null);
   const [projectCode, setProjectCode] = useState("");
   const [organizer, setOrganizer]   = useState("");
@@ -42,7 +42,7 @@ export default function MeetingUpload() {
     setStatus("ingesting");
     let ingestData;
     try {
-      ingestData = await ingestMeeting({ file, force });
+      ingestData = await ingestMeeting({ file, force }, token);
     } catch (err) {
       setError(err.message);
       setStatus("error");
@@ -57,7 +57,7 @@ export default function MeetingUpload() {
         project_code: projectCode || undefined,
         organizer:    organizer   || undefined,
         attendees:    attendees   || undefined,
-      });
+      }, token);
       setResult(data);
       setStatus("done");
     } catch (err) {

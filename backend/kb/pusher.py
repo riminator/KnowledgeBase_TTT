@@ -112,6 +112,7 @@ def push_meeting_entry(
     organizer: str | None = None,
     attendees: str | None = None,
     billable: bool = False,
+    user_id: str | None = None,
 ) -> dict:
     """
     Insert one row into TTT's time_entries table.
@@ -127,6 +128,7 @@ def push_meeting_entry(
         organizer:        From header or request.
         attendees:        From header or request.
         billable:         From header Billable field (default False).
+        user_id:          Supabase user UUID to associate this entry with.
     """
     today    = entry_date or date.today()
     duration = duration_minutes if duration_minutes is not None else _parse_duration_minutes(summary)
@@ -139,6 +141,7 @@ def push_meeting_entry(
 
     row = {
         "id":               str(uuid.uuid4()),
+        "user_id":          user_id,
         "project_code":     project,
         "task_type":        "meeting",
         "duration_minutes": duration,
@@ -156,12 +159,12 @@ def push_meeting_entry(
 
     sql = """
         INSERT INTO time_entries
-            (id, project_code, task_type, duration_minutes, entry_date,
+            (id, user_id, project_code, task_type, duration_minutes, entry_date,
              start_time, end_time,
              description, meeting_title, billable, confidence, status,
              organizer, attendees)
         VALUES
-            (%(id)s, %(project_code)s, %(task_type)s, %(duration_minutes)s,
+            (%(id)s, %(user_id)s, %(project_code)s, %(task_type)s, %(duration_minutes)s,
              %(entry_date)s, %(start_time)s, %(end_time)s,
              %(description)s, %(meeting_title)s,
              %(billable)s, %(confidence)s, %(status)s,

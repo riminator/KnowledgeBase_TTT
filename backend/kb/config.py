@@ -57,3 +57,7 @@ RAG_TOP_K: int = int(os.getenv("RAG_TOP_K", "5"))
 # ── Time Task Tracker ─────────────────────────────────────────────────────────
 TTT_DATABASE_URL: str = os.getenv("TTT_DATABASE_URL", "")
 TTT_PGSSL: bool = os.getenv("TTT_PGSSL", "true").lower() == "true"
+
+# ── Supabase Auth ─────────────────────────────────────────────────────────────
+# SUPABASE_JWT_SECRET — found in Supabase dashboard → Project Settings → API → JWT Secret
+SUPABASE_JWT_SECRET: str = os.getenv("SUPABASE_JWT_SECRET", "")

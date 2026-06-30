@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { getSources, deleteSource } from "../api";
 
-export default function Sources() {
+export default function Sources({ token }) {
   const [sources, setSources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -11,7 +11,7 @@ export default function Sources() {
     setLoading(true);
     setError(null);
     try {
-      setSources(await getSources());
+      setSources(await getSources(token));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -25,7 +25,7 @@ export default function Sources() {
     if (!confirm(`Delete all chunks for:\n${source}?`)) return;
     setDeleting(source);
     try {
-      await deleteSource(source);
+      await deleteSource(source, token);
       setSources((prev) => prev.filter((s) => s.source !== source));
     } catch (err) {
       alert(err.message);

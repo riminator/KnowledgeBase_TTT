@@ -157,7 +157,12 @@ def _extract_count(question: str) -> int | None:
     return None
 
 
-def query_ttt(question: str, limit: int = 20, force_meetings: bool = False) -> str:
+def query_ttt(
+    question: str,
+    limit: int = 20,
+    force_meetings: bool = False,
+    user_id: str | None = None,
+) -> str:
     """
     Run an appropriate SQL query against time_entries based on the question
     and return a formatted string suitable for use as LLM context.
@@ -167,6 +172,7 @@ def query_ttt(question: str, limit: int = 20, force_meetings: bool = False) -> s
         limit:          Max rows to return.
         force_meetings: When True, always use the meeting-list query shape
                         (used when called from a temporal meeting chat query).
+        user_id:        When set, restrict results to this user's entries only.
 
     Returns an empty string if TTT_DATABASE_URL is not configured.
     """
@@ -206,6 +212,7 @@ def query_ttt(question: str, limit: int = 20, force_meetings: bool = False) -> s
             WHERE task_type = 'meeting'
               AND entry_date BETWEEN %(start)s AND %(end)s
             {project_filter}
+            {user_filter}
             ORDER BY entry_date DESC
             LIMIT %(limit)s
         """
@@ -223,6 +230,7 @@ def query_ttt(question: str, limit: int = 20, force_meetings: bool = False) -> s
             FROM time_entries
             WHERE entry_date BETWEEN %(start)s AND %(end)s
             {project_filter}
+            {user_filter}
             GROUP BY project_code, task_type
             ORDER BY total_minutes DESC
             LIMIT %(limit)s
@@ -235,6 +243,7 @@ def query_ttt(question: str, limit: int = 20, force_meetings: bool = False) -> s
             WHERE entry_date BETWEEN %(start)s AND %(end)s
               AND billable = TRUE
             {project_filter}
+            {user_filter}
             ORDER BY entry_date DESC
             LIMIT %(limit)s
         """
@@ -247,18 +256,25 @@ def query_ttt(question: str, limit: int = 20, force_meetings: bool = False) -> s
             FROM time_entries
             WHERE entry_date BETWEEN %(start)s AND %(end)s
             {project_filter}
+            {user_filter}
             ORDER BY entry_date DESC
             LIMIT %(limit)s
         """
 
-    # Inject optional project filter
+    # Inject optional project and user filters
     if project:
         project_clause = "AND project_code ILIKE %(project)s"
         params["project"] = f"%{project}%"
     else:
         project_clause = ""
 
-    sql = sql.format(project_filter=project_clause)
+    if user_id:
+        user_clause = "AND user_id = %(user_id)s"
+        params["user_id"] = user_id
+    else:
+        user_clause = ""
+
+    sql = sql.format(project_filter=project_clause, user_filter=user_clause)
 
     try:
         conn = _get_conn()

@@ -1,35 +1,15 @@
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
-export async function searchDocs({ query, top_k = 5, file_type, source_filter }) {
-  const res = await fetch(`${BASE}/search`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query, top_k, file_type: file_type || null, source_filter: source_filter || null }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+// ── auth header helper ────────────────────────────────────────────────────────
+
+function authHeaders(token, extra = {}) {
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...extra,
+  };
 }
 
-export async function uploadFile(file, force = false) {
-  const form = new FormData();
-  form.append("file", file);
-  form.append("force", force);
-  const res = await fetch(`${BASE}/upload`, { method: "POST", body: form });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function getSources() {
-  const res = await fetch(`${BASE}/sources`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function deleteSource(source) {
-  const res = await fetch(`${BASE}/sources?source=${encodeURIComponent(source)}`, { method: "DELETE" });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
+// ── error parsing ─────────────────────────────────────────────────────────────
 
 async function throwApiError(res) {
   let msg;
@@ -42,19 +22,65 @@ async function throwApiError(res) {
   throw new Error(msg);
 }
 
-export async function ingestMeeting({ file, force = false }) {
-  const form = new FormData();
-  form.append("file", file);
-  form.append("force", force);
-  const res = await fetch(`${BASE}/ingest-meeting`, { method: "POST", body: form });
+// ── API calls ─────────────────────────────────────────────────────────────────
+
+export async function searchDocs({ query, top_k = 5, file_type, source_filter }, token) {
+  const res = await fetch(`${BASE}/search`, {
+    method: "POST",
+    headers: authHeaders(token, { "Content-Type": "application/json" }),
+    body: JSON.stringify({ query, top_k, file_type: file_type || null, source_filter: source_filter || null }),
+  });
   if (!res.ok) await throwApiError(res);
   return res.json();
 }
 
-export async function summarizeMeeting({ filename, project_code, organizer, attendees }) {
+export async function uploadFile(file, force = false, token) {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("force", force);
+  const res = await fetch(`${BASE}/upload`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: form,
+  });
+  if (!res.ok) await throwApiError(res);
+  return res.json();
+}
+
+export async function getSources(token) {
+  const res = await fetch(`${BASE}/sources`, {
+    headers: authHeaders(token),
+  });
+  if (!res.ok) await throwApiError(res);
+  return res.json();
+}
+
+export async function deleteSource(source, token) {
+  const res = await fetch(`${BASE}/sources?source=${encodeURIComponent(source)}`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+  if (!res.ok) await throwApiError(res);
+  return res.json();
+}
+
+export async function ingestMeeting({ file, force = false }, token) {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("force", force);
+  const res = await fetch(`${BASE}/ingest-meeting`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: form,
+  });
+  if (!res.ok) await throwApiError(res);
+  return res.json();
+}
+
+export async function summarizeMeeting({ filename, project_code, organizer, attendees }, token) {
   const res = await fetch(`${BASE}/summarize-meeting`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify({
       filename,
       project_code: project_code || null,
@@ -66,12 +92,12 @@ export async function summarizeMeeting({ filename, project_code, organizer, atte
   return res.json();
 }
 
-export async function chatWithKB({ question, history = [], top_k = 5, source_filter, file_type }) {
+export async function chatWithKB({ question, history = [], top_k = 5, source_filter, file_type }, token) {
   const res = await fetch(`${BASE}/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify({ question, history, top_k, source_filter: source_filter || null, file_type: file_type || null }),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) await throwApiError(res);
   return res.json();
 }

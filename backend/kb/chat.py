@@ -70,6 +70,7 @@ def ask(
     source_filter: str | None = None,
     file_type: str | None = None,
     skip_ttt: bool = False,
+    user_id: str | None = None,
 ) -> ChatResponse:
     """
     Run the RAG pipeline for a single question.
@@ -80,19 +81,20 @@ def ask(
         top_k:         Number of chunks to retrieve.
         source_filter: Optional substring filter on source path.
         file_type:     Optional file type filter.
+        user_id:       Supabase user UUID — scopes retrieval to this user only.
 
     Returns:
         ChatResponse with the LLM answer and retrieved source metadata.
     """
     # 1. Retrieve relevant chunks
     results: list[SearchResult] = search(
-        question, top_k=top_k, file_type=file_type, source_filter=source_filter
+        question, top_k=top_k, file_type=file_type, source_filter=source_filter, user_id=user_id
     )
 
     # 1b. Temporal intent — if the user asks about "last/latest/recent meeting",
     #     find the most-recent meeting date and bubble those chunks to the front.
     if _is_temporal_meeting_query(question):
-        most_recent_date = get_most_recent_meeting_date()
+        most_recent_date = get_most_recent_meeting_date(user_id=user_id)
         if most_recent_date:
             # Partition: chunks from the most-recent meeting first, rest after
             primary = [r for r in results if r.doc_metadata.get("meeting_date") == most_recent_date]
@@ -101,11 +103,12 @@ def ask(
             # If we got no semantic hits for the most-recent meeting, fetch more
             if not primary:
                 extra = search(
-                    question,
-                    top_k=top_k * 2,
-                    file_type=file_type,
-                    source_filter=source_filter,
-                )
+                        question,
+                        top_k=top_k * 2,
+                        file_type=file_type,
+                        source_filter=source_filter,
+                        user_id=user_id,
+                    )
                 primary = [r for r in extra if r.doc_metadata.get("meeting_date") == most_recent_date]
                 secondary = [r for r in extra if r.doc_metadata.get("meeting_date") != most_recent_date]
                 results = (primary + secondary)[:top_k]
@@ -119,9 +122,9 @@ def ask(
     ttt_context = ""
     if not skip_ttt:
         if _is_temporal_meeting_query(question):
-            ttt_context = query_ttt(question, force_meetings=True)
+            ttt_context = query_ttt(question, force_meetings=True, user_id=user_id)
         elif is_ttt_query(question):
-            ttt_context = query_ttt(question)
+            ttt_context = query_ttt(question, user_id=user_id)
 
     # 2. Build context block — TTT results first (structured), then vector chunks
     context_parts = []

@@ -32,7 +32,7 @@ function HighlightedSnippet({ text, query }) {
   );
 }
 
-export default function Search() {
+export default function Search({ token }) {
   const [query, setQuery] = useState("");
   const [topK, setTopK] = useState(5);
   const [fileType, setFileType] = useState("");
@@ -57,7 +57,7 @@ export default function Search() {
     setError(null);
     setExpandedIds(new Set());
     try {
-      const data = await searchDocs({ query, top_k: topK, file_type: fileType, source_filter: sourceFilter });
+      const data = await searchDocs({ query, top_k: topK, file_type: fileType, source_filter: sourceFilter }, token);
       setResults(data);
     } catch (err) {
       setError(err.message);

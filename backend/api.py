@@ -6,6 +6,10 @@ FastAPI application — exposes:
   DELETE /sources       delete a source by path
   POST /chat            RAG chatbot — retrieve + generate
   POST /ingest-meeting  ingest meeting file + push to Time Task Tracker
+
+All routes (except GET /health) require a valid Supabase JWT in the
+Authorization: Bearer <token> header. The user_id extracted from the token
+is used to scope every DB operation so users only see their own data.
 """
 from __future__ import annotations
 
@@ -16,10 +20,11 @@ from datetime import date
 from typing import Annotated
 
 import httpx
-from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from kb.auth import get_current_user
 from kb.chat import ChatMessage, ask as kb_ask
 from kb.db import init_db
 from kb.ingest import ingest
@@ -29,7 +34,7 @@ from kb.search import search as kb_search
 
 # ── app setup ────────────────────────────────────────────────────────────────
 
-app = FastAPI(title="KnowledgeBase API", version="0.1.0")
+app = FastAPI(title="KnowledgeBase API", version="0.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -116,10 +121,16 @@ class SummarizeMeetingRequest(BaseModel):
 
 # ── routes ───────────────────────────────────────────────────────────────────
 
+@app.get("/health", summary="Health check — no auth required")
+def health() -> dict:
+    return {"status": "ok"}
+
+
 @app.post("/upload", summary="Upload and ingest a file")
 async def upload_file(
     file: Annotated[UploadFile, File(description="Any supported file type")],
     force: Annotated[bool, Form()] = False,
+    user_id: str = Depends(get_current_user),
 ) -> dict:
     suffix = pathlib.Path(file.filename or "upload").suffix or ".bin"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -127,7 +138,7 @@ async def upload_file(
         tmp_path = pathlib.Path(tmp.name)
 
     try:
-        ingest(tmp_path, force=force, source_name=file.filename)
+        ingest(tmp_path, force=force, source_name=file.filename, user_id=user_id)
     finally:
         tmp_path.unlink(missing_ok=True)
 
@@ -135,31 +146,41 @@ async def upload_file(
 
 
 @app.post("/search", response_model=list[SearchResultOut], summary="Semantic search")
-def search(req: SearchRequest) -> list[SearchResultOut]:
+def search(
+    req: SearchRequest,
+    user_id: str = Depends(get_current_user),
+) -> list[SearchResultOut]:
     results = kb_search(
         req.query,
         top_k=req.top_k,
         file_type=req.file_type,
         source_filter=req.source_filter,
+        user_id=user_id,
     )
     return [SearchResultOut(**vars(r)) for r in results]
 
 
 @app.get("/sources", response_model=list[SourceOut], summary="List indexed sources")
-def sources() -> list[SourceOut]:
-    return [SourceOut(**s) for s in list_sources()]
+def sources(user_id: str = Depends(get_current_user)) -> list[SourceOut]:
+    return [SourceOut(**s) for s in list_sources(user_id=user_id)]
 
 
 @app.delete("/sources", summary="Delete a source by path")
-def delete(source: str = Query(..., description="Exact source path to delete")) -> dict:
-    n = delete_source(source)
+def delete(
+    source: str = Query(..., description="Exact source path to delete"),
+    user_id: str = Depends(get_current_user),
+) -> dict:
+    n = delete_source(source, user_id=user_id)
     if n == 0:
         raise HTTPException(status_code=404, detail="Source not found")
     return {"status": "ok", "deleted_chunks": n}
 
 
 @app.post("/chat", response_model=ChatResponseOut, summary="RAG chatbot")
-def chat(req: ChatRequest) -> ChatResponseOut:
+def chat(
+    req: ChatRequest,
+    user_id: str = Depends(get_current_user),
+) -> ChatResponseOut:
     history = [ChatMessage(role=t.role, content=t.content) for t in req.history]
     result = kb_ask(
         req.question,
@@ -167,6 +188,7 @@ def chat(req: ChatRequest) -> ChatResponseOut:
         top_k=req.top_k,
         source_filter=req.source_filter,
         file_type=req.file_type,
+        user_id=user_id,
     )
     return ChatResponseOut(
         answer=result.answer,
@@ -178,6 +200,7 @@ def chat(req: ChatRequest) -> ChatResponseOut:
 async def ingest_meeting(
     file: Annotated[UploadFile, File(description="Meeting transcript or notes file")],
     force: Annotated[bool, Form()] = False,
+    user_id: str = Depends(get_current_user),
 ) -> IngestMeetingIngestResponse:
     """
     Ingest the uploaded file into pgvector (same as /upload).
@@ -190,7 +213,7 @@ async def ingest_meeting(
         tmp_path = pathlib.Path(tmp.name)
 
     try:
-        ingest(tmp_path, force=force, source_name=file.filename)
+        ingest(tmp_path, force=force, source_name=file.filename, user_id=user_id)
     finally:
         tmp_path.unlink(missing_ok=True)
 
@@ -198,7 +221,10 @@ async def ingest_meeting(
 
 
 @app.post("/summarize-meeting", response_model=IngestMeetingResponse, summary="Summarize an ingested meeting and push to Time Task Tracker")
-def summarize_meeting(req: SummarizeMeetingRequest) -> IngestMeetingResponse:
+def summarize_meeting(
+    req: SummarizeMeetingRequest,
+    user_id: str = Depends(get_current_user),
+) -> IngestMeetingResponse:
     """
     Run RAG summarization on an already-ingested meeting file and push the result to TTT.
     Called as a second step after POST /ingest-meeting succeeds.
@@ -207,7 +233,13 @@ def summarize_meeting(req: SummarizeMeetingRequest) -> IngestMeetingResponse:
         "In 3-5 sentences summarise this meeting: topics discussed, decisions made, action items."
     )
     try:
-        rag_result = kb_ask(summary_question, source_filter=req.filename, top_k=3, skip_ttt=True)
+        rag_result = kb_ask(
+            summary_question,
+            source_filter=req.filename,
+            top_k=3,
+            skip_ttt=True,
+            user_id=user_id,
+        )
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 429:
             raise HTTPException(
@@ -220,7 +252,7 @@ def summarize_meeting(req: SummarizeMeetingRequest) -> IngestMeetingResponse:
     # Prefer values from the file header; fall back to what was passed in the request.
     file_meta: dict = {}
     try:
-        meta_hits = kb_search(req.filename, top_k=1, source_filter=req.filename)
+        meta_hits = kb_search(req.filename, top_k=1, source_filter=req.filename, user_id=user_id)
         if meta_hits:
             file_meta = meta_hits[0].doc_metadata or {}
     except Exception:
@@ -255,6 +287,7 @@ def summarize_meeting(req: SummarizeMeetingRequest) -> IngestMeetingResponse:
             meeting_time=meeting_time,
             duration_minutes=duration_minutes,
             billable=billable,
+            user_id=user_id,
         )
         ttt_id = pushed.get("id")
     except Exception as exc:
