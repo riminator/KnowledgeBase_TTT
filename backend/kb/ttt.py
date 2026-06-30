@@ -44,13 +44,14 @@ _TTT_PATTERNS = re.compile(
 # even when the user isn't asking about hours/billing.
 _MEETING_HISTORY_PATTERNS = re.compile(
     r"\b(before|prior|previous|earlier|other|another)\b.{0,40}\bmeetings?\b"
-    r"|\bmeetings?\b.{0,40}\b(before|prior|previous|earlier|other|another)\b"
+    r"|\bmeetings?\b.{0,40}\b(before|prior|previous|earlier|other|another|this)\b"
     r"|\ball (my |the )?meetings?\b"
     r"|\blist (my |the )?meetings?\b"
     r"|\bhow many meetings?\b"
     r"|\bmeeting histor(y|ies)\b"
     r"|\bprevious meetings?\b"
     r"|\bearlier meetings?\b"
+    r"|\bmeeting before\b"
     # "last two/three/N meetings", "recent meetings", "summarize N meetings"
     r"|\blast \w+ meetings?\b"
     r"|\brecent meetings?\b"

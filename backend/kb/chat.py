@@ -39,8 +39,8 @@ Context:
 # ── temporal intent detection ────────────────────────────────────────────────
 
 _TEMPORAL_PATTERNS = re.compile(
-    r"\b(last|latest|most recent|recent|newest|previous)\b.{0,40}\b(meeting|standup|stand-up|call|sync|session)s?\b"
-    r"|\b(meeting|standup|stand-up|call|sync|session)s?\b.{0,40}\b(last|latest|most recent|recent|newest|previous)\b",
+    r"\b(last|latest|most recent|recent|newest|previous|before)\b.{0,40}\b(meeting|standup|stand-up|call|sync|session)s?\b"
+    r"|\b(meeting|standup|stand-up|call|sync|session)s?\b.{0,40}\b(last|latest|most recent|recent|newest|previous|before)\b",
     re.IGNORECASE,
 )
 
