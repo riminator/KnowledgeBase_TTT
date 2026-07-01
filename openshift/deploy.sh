@@ -41,14 +41,23 @@ REQUIRED=(
   VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY
   SUPABASE_URL SUPABASE_JWT_SECRET
   EMBED_PROVIDER NOMIC_API_KEY NOMIC_EMBED_MODEL EMBED_DIMENSIONS
-  LLM_PROVIDER WATSONX_API_KEY WATSONX_URL WATSONX_PROJECT_ID WATSONX_MODEL_ID
-  RAG_TOP_K
-  POSTGRES_PASSWORD
+  LLM_PROVIDER RAG_TOP_K POSTGRES_PASSWORD
 )
 MISSING=()
 for VAR in "${REQUIRED[@]}"; do
   [[ -z "${!VAR:-}" ]] && MISSING+=("$VAR")
 done
+# Provider-specific validation
+case "${LLM_PROVIDER:-}" in
+  watsonx)
+    for VAR in WATSONX_API_KEY WATSONX_URL WATSONX_PROJECT_ID WATSONX_MODEL_ID; do
+      [[ -z "${!VAR:-}" ]] && MISSING+=("$VAR")
+    done ;;
+  openai)
+    for VAR in OPENAI_API_KEY OPENAI_BASE_URL OPENAI_CHAT_MODEL; do
+      [[ -z "${!VAR:-}" ]] && MISSING+=("$VAR")
+    done ;;
+esac
 if [[ ${#MISSING[@]} -gt 0 ]]; then
   echo ""
   echo "  ERROR: The following variables are not set in deploy.env:"
@@ -143,6 +152,25 @@ TTT_PGSSL="false"
 
 # ── Step 4: Apply secret ──────────────────────────────────────────────────────
 echo "▶ [4/5] Applying secrets"
+
+# Build provider-specific LLM args
+LLM_ARGS=()
+case "$LLM_PROVIDER" in
+  watsonx)
+    LLM_ARGS=(
+      --from-literal=WATSONX_API_KEY="$WATSONX_API_KEY"
+      --from-literal=WATSONX_URL="$WATSONX_URL"
+      --from-literal=WATSONX_PROJECT_ID="$WATSONX_PROJECT_ID"
+      --from-literal=WATSONX_MODEL_ID="$WATSONX_MODEL_ID"
+    ) ;;
+  openai)
+    LLM_ARGS=(
+      --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY"
+      --from-literal=OPENAI_BASE_URL="$OPENAI_BASE_URL"
+      --from-literal=OPENAI_CHAT_MODEL="$OPENAI_CHAT_MODEL"
+    ) ;;
+esac
+
 oc create secret generic knowledgebase-secrets \
   --from-literal=DATABASE_URL="$DATABASE_URL" \
   --from-literal=TTT_DATABASE_URL="$TTT_DATABASE_URL" \
@@ -154,11 +182,8 @@ oc create secret generic knowledgebase-secrets \
   --from-literal=NOMIC_EMBED_MODEL="$NOMIC_EMBED_MODEL" \
   --from-literal=EMBED_DIMENSIONS="$EMBED_DIMENSIONS" \
   --from-literal=LLM_PROVIDER="$LLM_PROVIDER" \
-  --from-literal=WATSONX_API_KEY="$WATSONX_API_KEY" \
-  --from-literal=WATSONX_URL="$WATSONX_URL" \
-  --from-literal=WATSONX_PROJECT_ID="$WATSONX_PROJECT_ID" \
-  --from-literal=WATSONX_MODEL_ID="$WATSONX_MODEL_ID" \
   --from-literal=RAG_TOP_K="$RAG_TOP_K" \
+  "${LLM_ARGS[@]}" \
   --dry-run=client -o yaml | oc apply -f -
 echo "  ✓ Secret applied"
 echo ""
