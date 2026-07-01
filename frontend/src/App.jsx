@@ -58,16 +58,16 @@ export default function App() {
             {/* Desktop nav */}
             <nav className="nav-desktop">
               <div className="nav-group">
-                <span className="nav-group-label">Knowledge Base</span>
-                {KB_TABS.map(t => (
-                  <button key={t} className={`tab-btn ${tab === t ? "active" : ""}`} onClick={() => switchTab(t)}>{t}</button>
+                <span className="nav-group-label ttt-label">Time Tracker</span>
+                {TTT_TABS.map(t => (
+                  <button key={t} className={`tab-btn ttt-tab ${tab === t ? "active" : ""}`} onClick={() => switchTab(t)}>{t}</button>
                 ))}
               </div>
               <div className="nav-divider" />
               <div className="nav-group">
-                <span className="nav-group-label ttt-label">Time Tracker</span>
-                {TTT_TABS.map(t => (
-                  <button key={t} className={`tab-btn ttt-tab ${tab === t ? "active" : ""}`} onClick={() => switchTab(t)}>{t}</button>
+                <span className="nav-group-label">Knowledge Base</span>
+                {KB_TABS.map(t => (
+                  <button key={t} className={`tab-btn ${tab === t ? "active" : ""}`} onClick={() => switchTab(t)}>{t}</button>
                 ))}
               </div>
             </nav>
