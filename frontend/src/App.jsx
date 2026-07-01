@@ -30,7 +30,7 @@ export default function App() {
       <header className="header">
         <div className="header-inner">
           <div className="header-row1">
-            <h1 className="logo">🗂 Knowledge<span>Base</span></h1>
+            <h1 className="logo">Work<span>Trace</span></h1>
             <nav className="tabs-kb">
               {KB_TABS.map(t => (
                 <button key={t} className={`tab-btn ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>

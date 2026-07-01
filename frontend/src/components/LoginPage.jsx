@@ -44,8 +44,8 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <h1 className="login-logo">🗂 KnowledgeBase</h1>
-        <p className="login-subtitle">Sign in to access your personal knowledge base.</p>
+        <h1 className="login-logo">WorkTrace</h1>
+        <p className="login-subtitle">Sign in to access your personal workspace.</p>
 
         <div className="oauth-buttons">
           <button className="oauth-btn google" onClick={handleGoogle}>
