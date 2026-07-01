@@ -127,7 +127,7 @@ function EntryDrawer({ entry, onClose }) {
       {/* Drawer */}
       <div style={{
         position: "fixed",
-        top: 0, right: 0, bottom: 0,
+        top: "var(--header-h)", right: 0, bottom: 0,
         width: 360,
         background: "var(--bg)",
         borderLeft: "1px solid var(--border)",
