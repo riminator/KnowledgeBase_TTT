@@ -34,6 +34,15 @@ spec:
     requests:
       storage: 10Gi       # change to 20Gi / 50Gi as needed — no quota limit
 ---
+# ── ServiceAccount with anyuid SCC ───────────────────────────────────────────
+# Grants the postgres pod permission to run as UID 999 (postgres user).
+# Apply the SCC binding once:
+#   oc adm policy add-scc-to-user anyuid -z postgres-sa
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres-sa
+---
 # ── StatefulSet ───────────────────────────────────────────────────────────────
 apiVersion: apps/v1
 kind: StatefulSet
@@ -52,8 +61,16 @@ spec:
       labels:
         app: knowledgebase-postgres
     spec:
-      securityContext:
-        fsGroup: 999          # postgres GID — makes the PVC writable by the postgres user
+      serviceAccountName: postgres-sa
+      initContainers:
+        - name: fix-permissions
+          image: busybox
+          command: ["sh", "-c", "mkdir -p /data/pgdata && chmod 700 /data/pgdata"]
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /data
+          securityContext:
+            runAsNonRoot: false   # busybox needs root to chmod
       containers:
         - name: postgres
           image: pgvector/pgvector:pg16
@@ -66,7 +83,7 @@ spec:
                 name: postgres-credentials
           env:
             - name: PGDATA
-              value: /var/lib/postgresql/data/pgdata   # subdirectory avoids lost+found conflict
+              value: /var/lib/postgresql/data/pgdata
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
@@ -89,14 +106,6 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 30
             failureThreshold: 3
-          securityContext:
-            allowPrivilegeEscalation: false
-            runAsNonRoot: true
-            seccompProfile:
-              type: RuntimeDefault
-            capabilities:
-              drop:
-                - ALL
       volumes:
         - name: postgres-data
           persistentVolumeClaim:
