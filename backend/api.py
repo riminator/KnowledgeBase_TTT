@@ -134,6 +134,8 @@ def health() -> dict:
 async def upload_file(
     file: Annotated[UploadFile, File(description="Any supported file type")],
     force: Annotated[bool, Form()] = False,
+    project_code: Annotated[str | None, Form()] = None,
+    doc_type: Annotated[str | None, Form()] = None,
     user_id: str = Depends(get_current_user),
 ) -> dict:
     suffix = pathlib.Path(file.filename or "upload").suffix or ".bin"
@@ -141,8 +143,14 @@ async def upload_file(
         shutil.copyfileobj(file.file, tmp)
         tmp_path = pathlib.Path(tmp.name)
 
+    extra_meta: dict = {}
+    if project_code:
+        extra_meta["project_code"] = project_code
+    if doc_type:
+        extra_meta["doc_type"] = doc_type
+
     try:
-        ingest(tmp_path, force=force, source_name=file.filename, user_id=user_id)
+        ingest(tmp_path, force=force, source_name=file.filename, user_id=user_id, extra_meta=extra_meta)
     finally:
         tmp_path.unlink(missing_ok=True)
 

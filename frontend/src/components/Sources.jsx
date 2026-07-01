@@ -76,7 +76,7 @@ export default function Sources({ token }) {
                 <tr key={s.source}>
                   <td style={{ color: "var(--muted)" }}>{i + 1}</td>
                   <td className="source-path">{s.source}</td>
-                  <td><span className="type-badge">{s.file_type}</span></td>
+                  <td><span className="type-badge">{s.file_type ? s.file_type.charAt(0).toUpperCase() + s.file_type.slice(1) : ""}</span></td>
                   <td style={{ textAlign: "right" }}>{s.chunks}</td>
                   <td>
                     <button

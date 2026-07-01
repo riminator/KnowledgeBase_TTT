@@ -52,6 +52,7 @@ def ingest(
     force: bool = False,
     source_name: str | None = None,
     user_id: str | None = None,
+    extra_meta: dict | None = None,
 ) -> None:
     """
     Ingest a single file or every supported file inside a directory.
@@ -64,6 +65,8 @@ def ingest(
                      Only used when *path* resolves to a single file.
         user_id:     Supabase user UUID to scope the document to. When set,
                      dedup check is also scoped to this user.
+        extra_meta:  Additional metadata to merge into doc_metadata (e.g.
+                     project_code, doc_type supplied by the uploader).
     """
     init_db()
     root = pathlib.Path(path).expanduser().resolve()
@@ -105,6 +108,14 @@ def ingest(
                     progress.advance(task)
                     continue
 
+                # Merge caller-supplied metadata (project_code, doc_type, etc.)
+                if extra_meta:
+                    doc_meta = {**doc_meta, **extra_meta}
+
+                # Allow caller to override the stored file_type label
+                stored_type = extra_meta.get("doc_type") if extra_meta else None
+                stored_type = stored_type or file_type
+
                 # Remove old records when force re-indexing
                 if force:
                     q = session.query(Document).filter(Document.source == source_key)
@@ -118,7 +129,7 @@ def ingest(
                     doc = Document(
                         user_id=user_id,
                         source=source_key,
-                        file_type=file_type,
+                        file_type=stored_type,
                         chunk_index=idx,
                         content=chunk,
                         embedding=vector,

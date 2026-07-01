@@ -35,10 +35,12 @@ export async function searchDocs({ query, top_k = 5, file_type, source_filter },
   return res.json();
 }
 
-export async function uploadFile(file, force = false, token) {
+export async function uploadFile(file, force = false, token, { projectCode, docType } = {}) {
   const form = new FormData();
   form.append("file", file);
   form.append("force", force);
+  if (projectCode) form.append("project_code", projectCode);
+  if (docType)     form.append("doc_type", docType);
   const res = await fetch(`${BASE}/upload`, {
     method: "POST",
     headers: authHeaders(token),

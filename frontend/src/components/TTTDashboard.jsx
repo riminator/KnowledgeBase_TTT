@@ -6,41 +6,6 @@ const PROJECT_COLORS = [
   "#d97706", "#dc2626", "#db2777", "#65a30d",
 ];
 
-function StatCard({ label, value, sub, accent = false }) {
-  return (
-    <div style={{
-      background: accent ? "var(--accent)" : "var(--bg)",
-      border: `1px solid ${accent ? "transparent" : "var(--border)"}`,
-      borderRadius: 10,
-      padding: "20px 22px",
-      display: "flex",
-      flexDirection: "column",
-      gap: 2,
-    }}>
-      <div style={{
-        fontSize: 26,
-        fontWeight: 700,
-        color: accent ? "#fff" : "var(--text)",
-        letterSpacing: "-0.5px",
-        lineHeight: 1.1,
-      }}>{value}</div>
-      <div style={{
-        fontSize: 13,
-        fontWeight: 600,
-        color: accent ? "rgba(255,255,255,0.85)" : "var(--text)",
-        marginTop: 4,
-      }}>{label}</div>
-      {sub && (
-        <div style={{
-          fontSize: 11,
-          color: accent ? "rgba(255,255,255,0.6)" : "var(--muted)",
-          marginTop: 1,
-        }}>{sub}</div>
-      )}
-    </div>
-  );
-}
-
 function formatDuration(mins) {
   const h = Math.floor(mins / 60), m = Math.round(mins % 60);
   if (h === 0) return `${m}m`;
@@ -62,7 +27,6 @@ function formatDateFull(d) {
 
 function formatTime(t) {
   if (!t) return null;
-  // t may be "HH:MM:SS" or "HH:MM"
   const [hh, mm] = t.split(":");
   const h = parseInt(hh, 10);
   const suffix = h >= 12 ? "PM" : "AM";
@@ -200,40 +164,186 @@ function EntryDrawer({ entry, onClose }) {
   );
 }
 
+/* ── Carousel stat card ─────────────────────────────────────────── */
+function CarouselStatCard({ slides, accent = false }) {
+  const [idx, setIdx] = useState(0);
+  const { label, value, sub } = slides[idx];
+  const prev = () => setIdx(i => (i - 1 + slides.length) % slides.length);
+  const next = () => setIdx(i => (i + 1) % slides.length);
+
+  const arrowBtn = (onClick, symbol, label) => (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      style={{
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        padding: "0 4px",
+        color: accent ? "rgba(255,255,255,0.7)" : "var(--muted)",
+        fontSize: 14,
+        lineHeight: 1,
+        flexShrink: 0,
+        transition: "color 0.1s",
+      }}
+      onMouseEnter={e => e.currentTarget.style.color = accent ? "#fff" : "var(--text)"}
+      onMouseLeave={e => e.currentTarget.style.color = accent ? "rgba(255,255,255,0.7)" : "var(--muted)"}
+    >{symbol}</button>
+  );
+
+  return (
+    <div style={{
+      background: accent ? "var(--accent)" : "var(--bg)",
+      border: `1px solid ${accent ? "transparent" : "var(--border)"}`,
+      borderRadius: 10,
+      padding: "16px 14px 16px 16px",
+      display: "flex",
+      flexDirection: "column",
+      gap: 2,
+      position: "relative",
+    }}>
+      {/* nav row */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, gap: 4 }}>
+        {arrowBtn(prev, "‹", "Previous stat")}
+        {/* dots */}
+        <div style={{ display: "flex", gap: 4, flex: 1, justifyContent: "center" }}>
+          {slides.map((_, i) => (
+            <div
+              key={i}
+              onClick={() => setIdx(i)}
+              style={{
+                width: 5, height: 5,
+                borderRadius: "50%",
+                cursor: "pointer",
+                background: i === idx
+                  ? (accent ? "#fff" : "var(--accent)")
+                  : (accent ? "rgba(255,255,255,0.35)" : "var(--border)"),
+                transition: "background 0.2s",
+              }}
+            />
+          ))}
+        </div>
+        {arrowBtn(next, "›", "Next stat")}
+      </div>
+
+      {/* value */}
+      <div style={{
+        fontSize: 26,
+        fontWeight: 700,
+        color: accent ? "#fff" : "var(--text)",
+        letterSpacing: "-0.5px",
+        lineHeight: 1.1,
+      }}>{value}</div>
+
+      {/* label */}
+      <div style={{
+        fontSize: 13,
+        fontWeight: 600,
+        color: accent ? "rgba(255,255,255,0.85)" : "var(--text)",
+        marginTop: 4,
+      }}>{label}</div>
+
+      {sub && (
+        <div style={{
+          fontSize: 11,
+          color: accent ? "rgba(255,255,255,0.6)" : "var(--muted)",
+          marginTop: 1,
+        }}>{sub}</div>
+      )}
+    </div>
+  );
+}
+
+/* ── Section header with toggle pills ──────────────────────────── */
+function SectionHeader({ title, options, value, onChange }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+        {title}
+      </div>
+      <div style={{ display: "flex", gap: 2, background: "var(--surface)", borderRadius: 6, padding: 2 }}>
+        {options.map(opt => (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              padding: "3px 9px",
+              borderRadius: 4,
+              border: "none",
+              cursor: "pointer",
+              background: value === opt.value ? "var(--bg)" : "transparent",
+              color: value === opt.value ? "var(--text)" : "var(--muted)",
+              boxShadow: value === opt.value ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+              transition: "all 0.15s",
+              whiteSpace: "nowrap",
+            }}
+          >{opt.label}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Main dashboard ─────────────────────────────────────────────── */
 export default function TTTDashboard({ token }) {
-  const [summary,       setSummary]     = useState(null);
-  const [recent,        setRecent]      = useState([]);
-  const [loading,       setLoading]     = useState(true);
-  const [error,         setError]       = useState(null);
+  const [summary,       setSummary]       = useState(null);
+  const [allEntries,    setAllEntries]    = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [error,         setError]         = useState(null);
   const [selectedEntry, setSelectedEntry] = useState(null);
+
+  // panel toggles
+  const [entriesView,  setEntriesView]  = useState("recent"); // "recent" | "all"
+  const [projectScope, setProjectScope] = useState("month");  // "month" | "alltime"
 
   useEffect(() => {
     async function load() {
       setLoading(true); setError(null);
       try {
         const entries = await getEntries({}, token);
-        setRecent(entries.slice(0, 8));
+        setAllEntries(entries);
 
         const now   = new Date();
         const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
         const end   = now.toISOString().split("T")[0];
         const monthEntries = entries.filter(e => e.date >= start && e.date <= end);
-        const totalMin  = monthEntries.reduce((s, e) => s + e.durationMinutes, 0);
-        const projects  = [...new Set(monthEntries.map(e => e.projectCode))];
-        const byProject = Object.entries(
-          monthEntries.reduce((acc, e) => {
-            acc[e.projectCode] = (acc[e.projectCode] || 0) + e.durationMinutes;
-            return acc;
-          }, {})
-        )
-          .sort((a, b) => b[1] - a[1])
-          .map(([project, mins]) => ({ project, hours: mins / 60 }));
+
+        // month stats
+        const monthMin      = monthEntries.reduce((s, e) => s + e.durationMinutes, 0);
+        const monthProjects = [...new Set(monthEntries.map(e => e.projectCode))];
+        const monthBillable = monthEntries.filter(e => e.billable).reduce((s, e) => s + e.durationMinutes, 0);
+        const monthByProj   = buildByProject(monthEntries);
+
+        // all-time stats
+        const totalMin      = entries.reduce((s, e) => s + e.durationMinutes, 0);
+        const totalProjects = [...new Set(entries.map(e => e.projectCode))];
+        const totalBillable = entries.filter(e => e.billable).reduce((s, e) => s + e.durationMinutes, 0);
+        const allByProj     = buildByProject(entries);
+
+        // average hours per day this month (days elapsed)
+        const daysElapsed = Math.max(1, now.getDate());
+        const avgPerDay   = monthMin / 60 / daysElapsed;
+
+        // most active project this month
+        const topProject = monthByProj[0]?.project || "—";
 
         setSummary({
+          // month
+          monthHours:   monthMin / 60,
+          monthEntries: monthEntries.length,
+          monthProjects: monthProjects.length,
+          monthBillableHours: monthBillable / 60,
+          avgHoursPerDay: avgPerDay,
+          topProject,
+          monthByProj,
+          // all-time
           totalHours:   totalMin / 60,
-          totalEntries: monthEntries.length,
-          projectCount: projects.length,
-          byProject,
+          totalEntries: entries.length,
+          totalProjects: totalProjects.length,
+          totalBillableHours: totalBillable / 60,
+          allByProj,
         });
       } catch (e) {
         setError(e.message);
@@ -247,87 +357,130 @@ export default function TTTDashboard({ token }) {
   if (loading) return <div className="card"><p className="loading">Loading dashboard…</p></div>;
   if (error)   return <div className="card"><p style={{ color: "var(--danger)" }}>{error}</p></div>;
 
-  const maxHours = summary.byProject[0]?.hours || 1;
+  // carousel slide definitions per card
+  const card1Slides = [
+    { label: "Hours this month",    value: summary.monthHours.toFixed(1),         sub: "tracked this month" },
+    { label: "Hours all time",      value: summary.totalHours.toFixed(1),          sub: "across all entries" },
+    { label: "Avg hours / day",     value: summary.avgHoursPerDay.toFixed(1),      sub: "this month so far" },
+    { label: "Billable hours",      value: summary.monthBillableHours.toFixed(1),  sub: "billable this month" },
+  ];
+
+  const card2Slides = [
+    { label: "Entries this month",  value: summary.monthEntries,    sub: "logged this month" },
+    { label: "Total entries",       value: summary.totalEntries,    sub: "all time" },
+    { label: "Billable hrs (all)",  value: summary.totalBillableHours.toFixed(1), sub: "billable all time" },
+  ];
+
+  const card3Slides = [
+    { label: "Active projects",     value: summary.monthProjects,   sub: "this month" },
+    { label: "Total projects",      value: summary.totalProjects,   sub: "all time" },
+    { label: "Top project",         value: summary.topProject,      sub: "most hours this month" },
+  ];
+
+  // entries panel data
+  const entriesToShow = entriesView === "recent"
+    ? allEntries.slice(0, 8)
+    : allEntries;
+
+  // hours by project data
+  const byProjectData    = projectScope === "month" ? summary.monthByProj : summary.allByProj;
+  const maxHours         = byProjectData[0]?.hours || 1;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Stat cards — 3 columns */}
+      {/* Stat cards — 3 carousel columns */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-        <StatCard accent label="Hours this month" value={summary.totalHours.toFixed(1)} sub="all time this month" />
-        <StatCard label="Total entries"   value={summary.totalEntries} sub="this month" />
-        <StatCard label="Active projects" value={summary.projectCount} sub="this month" />
+        <CarouselStatCard accent slides={card1Slides} />
+        <CarouselStatCard slides={card2Slides} />
+        <CarouselStatCard slides={card3Slides} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        {/* Recent entries */}
+        {/* Entries panel */}
         <div className="card" style={{ padding: "20px 22px", marginBottom: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 14 }}>
-            Recent Entries
-          </div>
-          {recent.length === 0
+          <SectionHeader
+            title="Entries"
+            options={[
+              { label: "Recent", value: "recent" },
+              { label: "All",    value: "all" },
+            ]}
+            value={entriesView}
+            onChange={setEntriesView}
+          />
+          {entriesToShow.length === 0
             ? <p className="empty">No entries yet.</p>
-            : recent.map((e, i) => (
-              <div
-                key={e.id}
-                onClick={() => setSelectedEntry(e)}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "9px 8px",
-                  borderRadius: 6,
-                  borderBottom: i < recent.length - 1 ? "1px solid var(--border)" : "none",
-                  gap: 10,
-                  cursor: "pointer",
-                  transition: "background 0.1s",
-                }}
-                onMouseEnter={ev => ev.currentTarget.style.background = "var(--surface)"}
-                onMouseLeave={ev => ev.currentTarget.style.background = "transparent"}
-              >
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{
-                    fontSize: 13,
-                    fontWeight: 500,
-                    color: "var(--text)",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}>
-                    {e.meetingTitle || "Untitled"}
+            : (
+              <div style={{ maxHeight: entriesView === "all" ? 420 : "none", overflowY: entriesView === "all" ? "auto" : "visible" }}>
+                {entriesToShow.map((e, i) => (
+                  <div
+                    key={e.id}
+                    onClick={() => setSelectedEntry(e)}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "9px 8px",
+                      borderRadius: 6,
+                      borderBottom: i < entriesToShow.length - 1 ? "1px solid var(--border)" : "none",
+                      gap: 10,
+                      cursor: "pointer",
+                      transition: "background 0.1s",
+                    }}
+                    onMouseEnter={ev => ev.currentTarget.style.background = "var(--surface)"}
+                    onMouseLeave={ev => ev.currentTarget.style.background = "transparent"}
+                  >
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: "var(--text)",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}>
+                        {e.meetingTitle || "Untitled"}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
+                        <span style={{ fontSize: 11, color: "var(--muted)" }}>{e.projectCode}</span>
+                        <span style={{ fontSize: 10, color: "var(--border)" }}>·</span>
+                        <span style={{ fontSize: 11, color: "var(--muted)" }}>{formatDate(e.date)}</span>
+                        <TaskTypePill type={e.taskType} />
+                      </div>
+                    </div>
+                    <div style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "var(--text)",
+                      background: "var(--surface)",
+                      padding: "2px 8px",
+                      borderRadius: 5,
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                    }}>
+                      {formatDuration(e.durationMinutes)}
+                    </div>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
-                    <span style={{ fontSize: 11, color: "var(--muted)" }}>{e.projectCode}</span>
-                    <span style={{ fontSize: 10, color: "var(--border)" }}>·</span>
-                    <span style={{ fontSize: 11, color: "var(--muted)" }}>{formatDate(e.date)}</span>
-                    <TaskTypePill type={e.taskType} />
-                  </div>
-                </div>
-                <div style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: "var(--text)",
-                  background: "var(--surface)",
-                  padding: "2px 8px",
-                  borderRadius: 5,
-                  whiteSpace: "nowrap",
-                  flexShrink: 0,
-                }}>
-                  {formatDuration(e.durationMinutes)}
-                </div>
+                ))}
               </div>
-            ))
+            )
           }
         </div>
 
         {/* Hours by project */}
         <div className="card" style={{ padding: "20px 22px", marginBottom: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 14 }}>
-            Hours by Project
-          </div>
-          {summary.byProject.length === 0
+          <SectionHeader
+            title="Hours by Project"
+            options={[
+              { label: "This month", value: "month" },
+              { label: "All time",   value: "alltime" },
+            ]}
+            value={projectScope}
+            onChange={setProjectScope}
+          />
+          {byProjectData.length === 0
             ? <p className="empty">No data yet.</p>
-            : summary.byProject.slice(0, 8).map((p, i) => (
-              <div key={p.project} style={{ marginBottom: i < summary.byProject.length - 1 ? 12 : 0 }}>
+            : byProjectData.slice(0, 8).map((p, i) => (
+              <div key={p.project} style={{ marginBottom: i < byProjectData.length - 1 ? 12 : 0 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                   <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>{p.project}</span>
                   <span style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>{p.hours.toFixed(1)}h</span>
@@ -350,4 +503,16 @@ export default function TTTDashboard({ token }) {
       <EntryDrawer entry={selectedEntry} onClose={() => setSelectedEntry(null)} />
     </div>
   );
+}
+
+/* ── helpers ────────────────────────────────────────────────────── */
+function buildByProject(entries) {
+  return Object.entries(
+    entries.reduce((acc, e) => {
+      acc[e.projectCode] = (acc[e.projectCode] || 0) + e.durationMinutes;
+      return acc;
+    }, {})
+  )
+    .sort((a, b) => b[1] - a[1])
+    .map(([project, mins]) => ({ project, hours: mins / 60 }));
 }

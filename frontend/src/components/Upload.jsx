@@ -2,6 +2,22 @@ import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { uploadFile } from "../api";
 
+const DOC_TYPES = [
+  { value: "",                   label: "Auto-detect" },
+  { value: "PDF",                label: "PDF" },
+  { value: "Document",           label: "Document" },
+  { value: "Meeting Transcript", label: "Meeting Transcript" },
+  { value: "Meeting Notes",      label: "Meeting Notes" },
+  { value: "Notes",              label: "Notes" },
+  { value: "Report",             label: "Report" },
+  { value: "Presentation",       label: "Presentation" },
+  { value: "Spreadsheet",        label: "Spreadsheet" },
+  { value: "Code",               label: "Code" },
+  { value: "Image",              label: "Image" },
+  { value: "Reference",          label: "Reference" },
+  { value: "Other",              label: "Other" },
+];
+
 function formatBytes(b) {
   if (b < 1024) return `${b} B`;
   if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
@@ -9,8 +25,10 @@ function formatBytes(b) {
 }
 
 export default function Upload({ token }) {
-  const [files, setFiles] = useState([]);   // [{ file, status, error }]
-  const [force, setForce] = useState(false);
+  const [files,       setFiles]       = useState([]);   // [{ file, status, error }]
+  const [force,       setForce]       = useState(false);
+  const [projectCode, setProjectCode] = useState("");
+  const [docType,     setDocType]     = useState("");
 
   const onDrop = useCallback((accepted) => {
     setFiles((prev) => [
@@ -32,7 +50,10 @@ export default function Upload({ token }) {
         prev.map((f) => (f.file === item.file ? { ...f, status: "uploading" } : f))
       );
       try {
-        await uploadFile(item.file, force, token);
+        await uploadFile(item.file, force, token, {
+          projectCode: projectCode.trim() || undefined,
+          docType:     docType || undefined,
+        });
         setFiles((prev) =>
           prev.map((f) => (f.file === item.file ? { ...f, status: "done" } : f))
         );
@@ -65,6 +86,34 @@ export default function Upload({ token }) {
           <div>Drag & drop files here, or click to select</div>
           <div className="dropzone-hint">
             PDF, DOCX, TXT, MD, CSV, JSON, images (PNG/JPG), code files, and more
+          </div>
+        </div>
+
+        {/* Metadata fields */}
+        <div style={{ display: "flex", gap: 12, marginTop: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label className="filter-label">Project Code</label>
+            <input
+              type="text"
+              className="small-input"
+              placeholder="e.g. PROJ-001"
+              value={projectCode}
+              onChange={(e) => setProjectCode(e.target.value)}
+              style={{ width: 160 }}
+            />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label className="filter-label">Document Type</label>
+            <select
+              className="select"
+              value={docType}
+              onChange={(e) => setDocType(e.target.value)}
+              style={{ width: 200 }}
+            >
+              {DOC_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
           </div>
         </div>
 
